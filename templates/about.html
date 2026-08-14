@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}How It Works{% endblock %}
+{% block content %}
+
+<h1>How It Works</h1>
+<p class="lead">What happens behind the scenes when you click "Get Recommendations."</p>
+
+<div class="step-list">
+    <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text"><b>Weather in.</b> For Live Mode, we fetch real hourly weather (temperature, humidity, sunlight intensity) for your coordinates. For Historical Mode, we use a sample recorded dataset instead.</div>
+    </div>
+    <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text"><b>Solar forecast.</b> A trained model combines that weather with your panel size to predict how much power your panels will generate, in 15-minute steps through the day.</div>
+    </div>
+    <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text"><b>Background load forecast.</b> A second model predicts your household's baseline power draw (things always pulling power, plus estimated heating/cooling) from the same weather and time-of-day signals.</div>
+    </div>
+    <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-text"><b>Surplus.</b> We subtract the background load from the solar forecast. Positive surplus means your panels are producing more than the house is quietly using.</div>
+    </div>
+    <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-text"><b>Scheduling.</b> For each appliance in your list, we scan the day for the window with the most solar surplus, sized to how long that appliance runs.</div>
+    </div>
+</div>
+
+<h2>Honest limitations</h2>
+<div class="panel">
+    <p style="color:var(--text-dim); font-size:14px; margin:0;">
+        The background load model is trained on a sample dataset, not your actual home, so treat it as
+        a reasonable estimate rather than a guarantee. It only knows what you tell it — your panel size
+        and appliance list are self-reported, and each forecast is a one-time snapshot, not continuous monitoring.
+    </p>
+</div>
+
+{% endblock %}

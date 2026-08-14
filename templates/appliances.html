@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block title %}My Appliances{% endblock %}
+{% block content %}
+
+<h1>My Appliances</h1>
+<p class="lead">Pick from common appliances below, or add your own. Set quantity, and enter power in watts or kilowatts, whichever your device label shows.</p>
+
+<h2>Quick add</h2>
+<div class="library-grid" id="libraryGrid"></div>
+
+<h2>Your list</h2>
+<div class="panel">
+    <div id="applianceRows"></div>
+    <div id="emptyMsg" style="color:var(--text-dim); font-size:14px; margin-bottom:12px;">
+        No appliances yet. Tap one above, or add a custom one below.
+    </div>
+    <div style="display:flex; gap:10px; margin-top:8px;">
+        <button class="secondary" onclick="addRow()">+ Add custom appliance</button>
+        <button onclick="saveAppliances()">Save changes</button>
+    </div>
+    <div id="saveStatus" style="margin-top:10px; font-size:13px; color:var(--accent);"></div>
+</div>
+
+<script>
+const APPLIANCE_LIBRARY = [
+    { icon: "💡", name: "LED bulb", duration_minutes: 240, typical_power_kW: 0.01 },
+    { icon: "🔌", name: "phone charger", duration_minutes: 90, typical_power_kW: 0.02 },
+    { icon: "🌀", name: "standing fan", duration_minutes: 240, typical_power_kW: 0.06 },
+    { icon: "📶", name: "wifi router", duration_minutes: 480, typical_power_kW: 0.01 },
+    { icon: "💻", name: "laptop", duration_minutes: 180, typical_power_kW: 0.06 },
+    { icon: "📺", name: "TV", duration_minutes: 180, typical_power_kW: 0.1 },
+    { icon: "🧊", name: "fridge/freezer", duration_minutes: 480, typical_power_kW: 0.15 },
+    { icon: "🍳", name: "microwave", duration_minutes: 15, typical_power_kW: 1.0 },
+    { icon: "☕", name: "electric kettle", duration_minutes: 10, typical_power_kW: 1.5 },
+    { icon: "👕", name: "iron", duration_minutes: 20, typical_power_kW: 1.2 },
+    { icon: "🧺", name: "washing machine", duration_minutes: 60, typical_power_kW: 0.8 },
+    { icon: "🍽️", name: "dishwasher", duration_minutes: 90, typical_power_kW: 1.2 },
+    { icon: "🚿", name: "water heater", duration_minutes: 30, typical_power_kW: 2.5 },
+    { icon: "❄️", name: "air conditioner", duration_minutes: 180, typical_power_kW: 1.5 },
+    { icon: "🥤", name: "blender", duration_minutes: 5, typical_power_kW: 0.4 },
+    { icon: "🚗", name: "EV charging", duration_minutes: 180, typical_power_kW: 3.5 },
+];
+
+function renderLibrary() {
+    const grid = document.getElementById("libraryGrid");
+    grid.innerHTML = APPLIANCE_LIBRARY.map((a, i) => `
+        <button class="library-chip" onclick="quickAdd(${i})">
+            <span class="chip-icon">${a.icon}</span>
+            <span class="chip-name">${a.name}</span>
+            <span class="chip-power">${a.typical_power_kW}kW</span>
+        </button>
+    `).join("");
+}
+
+function quickAdd(index) {
+    const a = APPLIANCE_LIBRARY[index];
+    // Small appliances are usually labeled in watts in real life -- default
+    // to W display for anything under 0.25kW so the number matches what's
+    // printed on the device, larger ones default to kW.
+    const useWatts = a.typical_power_kW <= 0.25;
+    const powerValue = useWatts ? Math.round(a.typical_power_kW * 1000) : a.typical_power_kW;
+    addRow({
+        name: a.name,
+        duration_minutes: a.duration_minutes,
+        power_value: powerValue,
+        power_unit: useWatts ? "W" : "kW",
+        quantity: 1,
+        active: true,
+    });
+}
+
+function updateEmptyMsg() {
+    const rows = document.querySelectorAll(".appliance-row");
+    document.getElementById("emptyMsg").style.display = rows.length === 0 ? "block" : "none";
+}
+
+function computeRowKw(row) {
+    const value = parseFloat(row.querySelector(".power-value").value) || 0;
+    const unit = row.querySelector(".power-unit").value;
+    const qty = parseFloat(row.querySelector(".quantity").value) || 1;
+    const perUnitKw = unit === "W" ? value / 1000 : value;
+    return perUnitKw * qty;
+}
+
+function updateRowTotal(row) {
+    const totalKw = computeRowKw(row);
+    row.querySelector(".row-total").textContent = `= ${totalKw.toFixed(3)} kW total`;
+}
+
+function addRow(a) {
+    a = a || { name: "", duration_minutes: 60, power_value: 1.0, power_unit: "kW", quantity: 1, active: true };
+    if (a.active === undefined) a.active = true;
+    if (a.quantity === undefined) a.quantity = 1;
+    if (a.power_unit === undefined) a.power_unit = "kW";
+    if (a.power_value === undefined) a.power_value = a.typical_power_kW ?? 1.0;
+
+    const container = document.getElementById("applianceRows");
+    const row = document.createElement("div");
+    row.className = "appliance-row";
+    row.style.flexWrap = "wrap";
+    row.dataset.active = a.active ? "true" : "false";
+    row.style.opacity = a.active ? "1" : "0.45";
+    row.innerHTML = `
+        <div class="field-group name-field">
+            <input class="name" type="text" placeholder="e.g. table fan" value="${a.name}">
+            <span>Appliance name</span>
+        </div>
+        <div class="field-group" style="max-width:110px;">
+            <input class="duration" type="number" value="${a.duration_minutes}">
+            <span>Duration (min)</span>
+        </div>
+        <div class="field-group" style="max-width:90px;">
+            <input class="quantity" type="number" min="1" value="${a.quantity}" oninput="updateRowTotal(this.closest('.appliance-row'))">
+            <span>How many</span>
+        </div>
+        <div class="field-group" style="max-width:100px;">
+            <input class="power-value" type="number" step="0.01" value="${a.power_value}" oninput="updateRowTotal(this.closest('.appliance-row'))">
+            <span>Power per unit</span>
+        </div>
+        <div class="field-group" style="max-width:90px;">
+            <select class="power-unit" onchange="updateRowTotal(this.closest('.appliance-row'))">
+                <option value="W" ${a.power_unit === "W" ? "selected" : ""}>Watts</option>
+                <option value="kW" ${a.power_unit === "kW" ? "selected" : ""}>kW</option>
+            </select>
+            <span>Unit</span>
+        </div>
+        <div class="field-group" style="max-width:130px;">
+            <span class="row-total" style="font-size:13px; color:var(--accent); font-weight:600; padding-top:11px;">= -- kW total</span>
+        </div>
+        <button class="secondary toggle-btn" onclick="toggleRow(this)">${a.active ? "On" : "Off"}</button>
+        <button class="remove" onclick="removeRow(this)">Remove</button>
+    `;
+    container.appendChild(row);
+    updateRowTotal(row);
+    updateEmptyMsg();
+}
+
+function removeRow(btn) {
+    btn.parentElement.remove();
+    updateEmptyMsg();
+}
+
+function toggleRow(btn) {
+    const row = btn.parentElement;
+    const isActive = row.dataset.active === "true";
+    row.dataset.active = isActive ? "false" : "true";
+    row.style.opacity = isActive ? "0.45" : "1";
+    btn.textContent = isActive ? "Off" : "On";
+}
+
+async function loadAppliances() {
+    try {
+        const res = await fetch("/api/appliances");
+        const data = await res.json();
+        (data.appliances || []).forEach(a => addRow(a));
+    } catch (e) {
+        console.error("Failed to load appliances:", e);
+    }
+    updateEmptyMsg();
+}
+
+async function saveAppliances() {
+    const rows = document.querySelectorAll(".appliance-row");
+    const appliances = [];
+    rows.forEach(row => {
+        const name = row.querySelector(".name").value.trim();
+        const duration = parseFloat(row.querySelector(".duration").value);
+        const quantity = parseFloat(row.querySelector(".quantity").value) || 1;
+        const powerValue = parseFloat(row.querySelector(".power-value").value);
+        const powerUnit = row.querySelector(".power-unit").value;
+        const active = row.dataset.active === "true";
+        const typical_power_kW = computeRowKw(row);
+
+        if (name && duration > 0 && typical_power_kW > 0) {
+            appliances.push({
+                name, duration_minutes: duration,
+                quantity, power_value: powerValue, power_unit: powerUnit,
+                typical_power_kW, active,
+            });
+        }
+    });
+
+    try {
+        await fetch("/api/appliances", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ appliances }),
+        });
+        document.getElementById("saveStatus").textContent =
+            appliances.length > 0
+                ? "Saved. Only 'On' appliances will be used for recommendations."
+                : "Saved as empty -- no appliances will be scheduled until you add some.";
+    } catch (e) {
+        document.getElementById("saveStatus").textContent = "Failed to save -- check your connection and try again.";
+        console.error(e);
+    }
+    setTimeout(() => { document.getElementById("saveStatus").textContent = ""; }, 4000);
+}
+
+renderLibrary();
+document.addEventListener("DOMContentLoaded", loadAppliances);
+</script>
+{% endblock %}

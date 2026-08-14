@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}Weather Forecast{% endblock %}
+{% block content %}
+
+<h1>Weather Forecast</h1>
+<p class="lead">Hourly and daily outlook for your location -- the same weather your solar predictions are built from.</p>
+
+<div class="controls">
+    <div class="field-group" style="max-width:160px;">
+        <input id="latInput" type="text" value="6.5244">
+        <span>Latitude</span>
+    </div>
+    <div class="field-group" style="max-width:160px;">
+        <input id="lonInput" type="text" value="3.3792">
+        <span>Longitude</span>
+    </div>
+    <button onclick="loadWeather()">Get Forecast</button>
+</div>
+
+<div id="loading" style="display:none;">Fetching weather...</div>
+
+<h2>Daily outlook</h2>
+<div class="cards" id="dailyCards"></div>
+
+<h2>Hourly detail</h2>
+<div id="chartContainer">
+    <canvas id="weatherChart" height="90"></canvas>
+</div>
+
+<script>
+let chart = null;
+
+async function loadSavedLocation() {
+    const res = await fetch("/api/live-settings");
+    const data = await res.json();
+    if (data.lat) document.getElementById("latInput").value = data.lat;
+    if (data.lon) document.getElementById("lonInput").value = data.lon;
+}
+document.addEventListener("DOMContentLoaded", loadSavedLocation);
+
+async function loadWeather() {
+    document.getElementById("loading").style.display = "block";
+    document.getElementById("dailyCards").innerHTML = "";
+
+    const lat = parseFloat(document.getElementById("latInput").value) || 6.5244;
+    const lon = parseFloat(document.getElementById("lonInput").value) || 3.3792;
+
+    const res = await fetch("/api/weather-forecast", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lat, lon, days: 3 }),
+    });
+    const data = await res.json();
+    document.getElementById("loading").style.display = "none";
+
+    if (data.error) {
+        document.getElementById("dailyCards").innerHTML = `<div class="result-card">${data.error}</div>`;
+        return;
+    }
+
+    renderDailyCards(data.daily_summary);
+    renderChart(data.hourly);
+}
+
+function renderDailyCards(daily) {
+    const container = document.getElementById("dailyCards");
+    container.innerHTML = daily.map(d => `
+        <div class="panel">
+            <h3 style="margin-top:0;">${d.label} <span style="font-size:12px; color:var(--text-dim); font-weight:400;">${d.date}</span></h3>
+            <div style="font-size:22px; font-weight:700;">${d.min_temp_C}° - ${d.max_temp_C}°C</div>
+            <div style="font-size:13px; color:var(--text-dim); margin-top:6px;">
+                Cloud cover: ${d.avg_cloudcover_pct}%<br>
+                Rainfall: ${d.total_precipitation_mm} mm<br>
+                Peak sun: ${d.peak_irradiance_Wm2} W/m²
+            </div>
+        </div>
+    `).join("");
+}
+
+function renderChart(hourly) {
+    const labels = hourly.map(r => r.timestamp.replace("T", " ").slice(5, 16));
+    const temp = hourly.map(r => r.outdoor_temp_C);
+    const irradiance = hourly.map(r => r.solar_irradiance_Wm2);
+    const cloud = hourly.map(r => r.cloudcover_pct);
+
+    const ctx = document.getElementById("weatherChart").getContext("2d");
+    if (chart) chart.destroy();
+    
+    const isLight = document.body.classList.contains('light-theme');
+    const colors = {
+        text: isLight ? '#475569' : '#9aa0a6',
+        grid: isLight ? 'rgba(0,0,0,0.05)' : '#262b36',
+        temp: isLight ? '#ef4444' : '#ef4444',
+        irradiance: isLight ? '#f59e0b' : '#f59e0b',
+        cloud: isLight ? '#3b82f6' : '#3b82f6'
+    };
+
+    const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+    gradient.addColorStop(0, isLight ? 'rgba(245,158,11,0.2)' : 'rgba(245,158,11,0.2)');
+    gradient.addColorStop(1, 'rgba(245,158,11,0)');
+
+    chart = new Chart(ctx, {
+        type: "line",
+        data: {
+            labels: labels,
+            datasets: [
+                { label: "Temperature (°C)", data: temp, borderColor: colors.temp, borderWidth: 2, pointRadius: 0, tension: 0.4, yAxisID: "y" },
+                { label: "Solar Irradiance (W/m²)", data: irradiance, borderColor: colors.irradiance, backgroundColor: gradient, fill: true, borderWidth: 2, pointRadius: 0, tension: 0.4, yAxisID: "y1" },
+                { label: "Cloud Cover (%)", data: cloud, borderColor: colors.cloud, borderWidth: 2, borderDash: [4, 4], pointRadius: 0, tension: 0.4, yAxisID: "y1" },
+            ]
+        },
+        options: {
+            responsive: true,
+            animation: { duration: 800, easing: 'easeOutQuart' },
+            interaction: { mode: 'index', intersect: false },
+            plugins: { 
+                legend: { labels: { color: colors.text, font: { family: 'Inter' } } },
+                tooltip: { backgroundColor: isLight ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.8)', titleColor: isLight ? '#000' : '#fff', bodyColor: isLight ? '#000' : '#fff', borderColor: colors.grid, borderWidth: 1 }
+            },
+            scales: {
+                x: { ticks: { color: colors.text, maxTicksLimit: 12 }, grid: { color: colors.grid } },
+                y: { position: "left", ticks: { color: colors.text }, grid: { color: colors.grid } },
+                y1: { position: "right", ticks: { color: colors.text }, grid: { drawOnChartArea: false } }
+            }
+        }
+    });
+}
+
+window.addEventListener('themeChanged', loadWeather);
+
+loadWeather();
+</script>
+{% endblock %}

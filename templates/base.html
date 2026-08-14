@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}Smart Solar Energy Advisor{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+</head>
+<body>
+
+<script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js');
+        });
+    }
+</script>
+
+<nav class="sidebar">
+    <div class="brand"><span class="dot"></span> Solar Advisor</div>
+    <a class="nav-link {% if active == 'home' %}active{% endif %}" href="{{ url_for('home') }}">🏠 Home</a>
+    <a class="nav-link {% if active == 'live' %}active{% endif %}" href="{{ url_for('live_page') }}">⚡ Live Mode</a>
+    <a class="nav-link {% if active == 'advisor' %}active{% endif %}" href="{{ url_for('advisor_page') }}">🤖 AI Advisor</a>
+    <a class="nav-link {% if active == 'weather' %}active{% endif %}" href="{{ url_for('weather_page') }}">🌤️ Weather</a>
+    <a class="nav-link {% if active == 'appliances' %}active{% endif %}" href="{{ url_for('appliances_page') }}">🔌 Appliances</a>
+    <a class="nav-link {% if active == 'historical' %}active{% endif %}" href="{{ url_for('historical_page') }}">📊 Historical</a>
+    <a class="nav-link {% if active == 'about' %}active{% endif %}" href="{{ url_for('about_page') }}">❓ How It Works</a>
+    
+    <div style="flex: 1;"></div>
+    
+    <button id="themeToggle" style="margin-bottom: 20px; background: transparent; border: 1px solid var(--border); box-shadow: none; color: var(--text-dim); justify-content: flex-start; gap: 12px; width: 100%;">
+        <span class="icon">🌙</span> <span class="label">Dark Mode</span>
+    </button>
+
+    <div class="sidebar-footer">Smart Solar Energy Advisor</div>
+</nav>
+
+    <div class="main">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Voice AI Floating Action Button -->
+    <button id="voiceBtn" class="voice-fab" aria-label="Talk to Solar Advisor">
+        🎙️
+    </button>
+    <div id="voiceStatus" class="voice-status"></div>
+
+    <style>
+        .voice-fab {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: var(--accent-blue);
+            color: white;
+            font-size: 24px;
+            border: none;
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+            cursor: pointer;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .voice-fab:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 25px rgba(59, 130, 246, 0.6);
+        }
+        .voice-fab.listening {
+            animation: pulse 1.5s infinite;
+            background: #ef4444;
+            box-shadow: 0 4px 20px rgba(239, 68, 68, 0.4);
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { transform: scale(1.1); box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        .voice-status {
+            position: fixed;
+            bottom: 100px;
+            right: 30px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            z-index: 999;
+            max-width: 300px;
+        }
+        .light-theme .voice-status {
+            background: rgba(255, 255, 255, 0.9);
+            color: black;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+    </style>
+
+    <script>
+        const voiceBtn = document.getElementById('voiceBtn');
+        const voiceStatus = document.getElementById('voiceStatus');
+        
+        let recognition = null;
+        if ('webkitSpeechRecognition' in window) {
+            recognition = new webkitSpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            
+            recognition.onstart = function() {
+                voiceBtn.classList.add('listening');
+                showStatus("Listening...");
+            };
+            
+            recognition.onresult = async function(event) {
+                const transcript = event.results[0][0].transcript;
+                showStatus(`You: "${transcript}"`);
+                voiceBtn.classList.remove('listening');
+                
+                try {
+                    const res = await fetch('/api/voice-command', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ transcription: transcript })
+                    });
+                    const data = await res.json();
+                    
+                    if (data.message) {
+                        showStatus(`AI: ${data.message}`);
+                        speakText(data.message);
+                        
+                        // If they added an appliance, we might want to refresh the live page if we are on it
+                        if (data.action === "ADD_APPLIANCE" && window.location.pathname === '/live') {
+                            setTimeout(() => window.location.reload(), 2000);
+                        }
+                    } else if (data.error) {
+                        showStatus(`Error: ${data.error}`);
+                    }
+                } catch (e) {
+                    showStatus("Failed to reach AI.");
+                }
+            };
+            
+            recognition.onerror = function(event) {
+                voiceBtn.classList.remove('listening');
+                showStatus("Microphone error. Try again.");
+            };
+            
+            recognition.onend = function() {
+                voiceBtn.classList.remove('listening');
+            };
+        } else {
+            voiceBtn.style.display = 'none'; // Hide if unsupported
+        }
+
+        voiceBtn.addEventListener('click', () => {
+            if (recognition) {
+                if (voiceBtn.classList.contains('listening')) {
+                    recognition.stop();
+                } else {
+                    recognition.start();
+                }
+            }
+        });
+
+        function showStatus(text) {
+            voiceStatus.textContent = text;
+            voiceStatus.style.opacity = 1;
+            setTimeout(() => {
+                if (voiceStatus.textContent === text) {
+                    voiceStatus.style.opacity = 0;
+                }
+            }, 5000);
+        }
+
+        function speakText(text) {
+            if ('speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance(text);
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+    </script>
+
+<!-- Toast Notifications -->
+<div id="toast-container"></div>
+
+<script>
+// --- Theme Toggle Logic ---
+const themeToggle = document.getElementById('themeToggle');
+const body = document.body;
+
+function setTheme(isLight) {
+    if (isLight) {
+        body.classList.add('light-theme');
+        themeToggle.querySelector('.icon').textContent = '☀️';
+        themeToggle.querySelector('.label').textContent = 'Light Mode';
+        localStorage.setItem('solar_theme', 'light');
+    } else {
+        body.classList.remove('light-theme');
+        themeToggle.querySelector('.icon').textContent = '🌙';
+        themeToggle.querySelector('.label').textContent = 'Dark Mode';
+        localStorage.setItem('solar_theme', 'dark');
+    }
+    
+    // Dispatch an event so Chart.js components can redraw
+    window.dispatchEvent(new Event('themeChanged'));
+}
+
+// Check saved preference
+if (localStorage.getItem('solar_theme') === 'light') {
+    setTheme(true);
+}
+
+themeToggle.addEventListener('click', () => {
+    const isLight = !body.classList.contains('light-theme');
+    setTheme(isLight);
+});
+
+// --- Toast Notification System ---
+window.showToast = function(message, type = 'success') {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    
+    // Icon based on type
+    const icon = type === 'success' ? '✅' : '❌';
+    toast.innerHTML = `<span>${icon}</span> <div>${message}</div>`;
+    
+    container.appendChild(toast);
+    
+    // Trigger animation
+    setTimeout(() => toast.classList.add('show'), 10);
+    
+    // Remove after 3 seconds
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+</script>
+
+</body>
+</html>

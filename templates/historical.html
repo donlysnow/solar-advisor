@@ -1,0 +1,390 @@
+{% extends "base.html" %}
+{% block title %}Historical Mode{% endblock %}
+{% block content %}
+
+<h1>Historical Mode</h1>
+<p class="lead">Test the model against the sample dataset, or revisit a day you logged in Live Mode.</p>
+
+<div class="controls">
+    <div class="field-group" style="max-width:200px;">
+        <select id="sourceSelect" onchange="onSourceChange()">
+            <option value="sample">Sample Dataset</option>
+            <option value="mylog">My Live Log</option>
+        </select>
+        <span>Data source</span>
+    </div>
+    <div class="field-group" style="max-width:160px;" id="houseGroup">
+        <select id="houseSelect"></select>
+        <span>House</span>
+    </div>
+    <div class="field-group" style="max-width:180px;">
+        <select id="dateSelect"></select>
+        <span>Date</span>
+    </div>
+    <button onclick="loadRecommendations()">Get Recommendations</button>
+</div>
+
+<h2>Using appliances</h2>
+<div id="applianceSummary" style="margin-bottom:20px;"></div>
+
+<div id="summaryBanner"></div>
+
+<div id="loading" style="display:none;">Loading forecast...</div>
+<div id="emptyState" style="display:none;" class="panel">
+    You have no active appliances, so there's nothing to schedule yet.
+    <a href="/appliances" style="color:var(--accent-blue);">Add or turn on appliances</a> to get a personalized plan.
+</div>
+<div class="cards" id="cards"></div>
+
+<h2>Load, PV & surplus curve</h2>
+<div id="chartContainer" style="margin-bottom:24px;">
+    <canvas id="energyChart" height="90"></canvas>
+</div>
+
+<h2>Hourly solar generation</h2>
+<div class="panel" style="margin-bottom:12px;">
+    <span style="font-size:13px; color:var(--text-dim);">Total for the day</span>
+    <div id="totalGenLabel" style="font-size:28px; font-weight:800; margin-top:4px;">-- kWh</div>
+</div>
+<div id="hourlyChartContainer" style="margin-bottom:16px;">
+    <canvas id="hourlyChart" height="80"></canvas>
+</div>
+
+<button class="secondary" id="exportBtn" style="display:none;" onclick="exportPlan()">Download this plan as text</button>
+
+<script>
+let chart = null;
+let hourlyChart = null;
+let currentData = null;
+
+async function loadApplianceSummary() {
+    const res = await fetch("/api/appliances");
+    const data = await res.json();
+    const activeAppliances = (data.appliances || []).filter(a => a.active !== false);
+    const container = document.getElementById("applianceSummary");
+    if (activeAppliances.length === 0) {
+        container.innerHTML = `No active appliances. <a href="/appliances" style="color:var(--accent-blue);">Add or turn some on</a>.`;
+        return;
+    }
+    container.innerHTML = activeAppliances.map(a =>
+        `<span class="pill">${a.name} <span class="power">${a.duration_minutes}min · ${a.typical_power_kW}kW</span></span>`
+    ).join("") + ` <a href="/appliances" style="font-size:13px; color:var(--text-dim);">Edit list</a>`;
+}
+
+async function loadHouses() {
+    const res = await fetch("/api/houses");
+    const data = await res.json();
+    const select = document.getElementById("houseSelect");
+    select.innerHTML = "";
+    data.house_ids.forEach(id => {
+        const opt = document.createElement("option");
+        opt.value = id;
+        opt.textContent = "House " + id;
+        select.appendChild(opt);
+    });
+    loadDates();
+}
+
+async function loadDates() {
+    const source = document.getElementById("sourceSelect").value;
+    const select = document.getElementById("dateSelect");
+    select.innerHTML = "";
+
+    if (source === "sample") {
+        const houseId = document.getElementById("houseSelect").value;
+        const res = await fetch(`/api/dates?house_id=${houseId}`);
+        const data = await res.json();
+        data.dates.forEach(d => {
+            const opt = document.createElement("option");
+            opt.value = d;
+            opt.textContent = d;
+            select.appendChild(opt);
+        });
+    } else {
+        const res = await fetch("/api/my-log/dates");
+        const data = await res.json();
+        if (data.dates.length === 0) {
+            const opt = document.createElement("option");
+            opt.textContent = "No logged days yet -- use Live Mode first";
+            select.appendChild(opt);
+        }
+        data.dates.forEach(d => {
+            const opt = document.createElement("option");
+            opt.value = d;
+            opt.textContent = d;
+            select.appendChild(opt);
+        });
+    }
+}
+
+function onSourceChange() {
+    const source = document.getElementById("sourceSelect").value;
+    document.getElementById("houseGroup").style.display = source === "sample" ? "flex" : "none";
+    loadDates();
+}
+
+document.addEventListener("DOMContentLoaded", () => { loadHouses(); loadApplianceSummary(); });
+document.getElementById("houseSelect")?.addEventListener("change", loadDates);
+
+async function loadRecommendations() {
+    const source = document.getElementById("sourceSelect").value;
+    const date = document.getElementById("dateSelect").value;
+
+    document.getElementById("loading").style.display = "block";
+    document.getElementById("emptyState").style.display = "none";
+    document.getElementById("exportBtn").style.display = "none";
+    document.getElementById("cards").innerHTML = "";
+
+    let data;
+    if (source === "sample") {
+        const houseId = document.getElementById("houseSelect").value;
+        const res = await fetch("/api/recommendations", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ house_id: parseInt(houseId), date }),
+        });
+        data = await res.json();
+    } else {
+        const res = await fetch(`/api/my-log/day?date=${date}`);
+        data = await res.json();
+    }
+
+    document.getElementById("loading").style.display = "none";
+
+    if (data.error) {
+        document.getElementById("cards").innerHTML = `<div class="result-card">${data.error}</div>`;
+        return;
+    }
+
+    currentData = data;
+    const hasAppliances = Object.keys(data.recommendations).length > 0;
+    document.getElementById("emptyState").style.display = hasAppliances ? "none" : "block";
+    document.getElementById("exportBtn").style.display = hasAppliances ? "inline-block" : "none";
+
+    renderSummary(data.summary);
+    renderCards(data.recommendations);
+    renderChart(data.day_data);
+    renderHourlyChart(data.day_data);
+}
+
+function exportPlan() {
+    if (!currentData) return;
+    const date = currentData.date || new Date().toISOString().slice(0, 10);
+    let text = `Smart Solar Energy Advisor -- Plan for ${date}\n`;
+    text += `${currentData.summary.headline}\n\n`;
+    text += `Solar generation: ${currentData.summary.total_pv_kWh_today} kWh\n`;
+    text += `Appliances fully solar-covered: ${currentData.summary.appliances_covered}/${currentData.summary.appliances_total}\n`;
+    text += `Estimated grid energy saved: ~${currentData.summary.estimated_kwh_saved} kWh\n`;
+    text += `Estimated NGN saved: ~${currentData.summary.estimated_cost_saved}\n\n`;
+    text += `Appliance schedule:\n`;
+    for (const [name, w] of Object.entries(currentData.recommendations)) {
+        if (!w) { text += `- ${name}: no window found\n`; continue; }
+        const start = w.start_time.split(" ")[1]?.slice(0, 5) || w.start_time;
+        const end = w.end_time.split(" ")[1]?.slice(0, 5) || w.end_time;
+        text += `- ${name}: ${start} - ${end} (${w.coverage_pct}% solar covered)\n`;
+    }
+
+    const blob = new Blob([text], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `solar-plan-${date}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function renderSummary(summary) {
+    const banner = document.getElementById("summaryBanner");
+    if (!summary) { banner.innerHTML = ""; return; }
+    banner.innerHTML = `
+        <div class="summary-banner quality-${summary.solar_quality}">
+            <div class="headline">${summary.headline}</div>
+            <div class="summary-stats">
+                <div class="summary-stat"><span class="value">${summary.total_pv_kWh_today} kWh</span><span class="label">Solar generation today</span></div>
+                <div class="summary-stat"><span class="value">${summary.appliances_covered}/${summary.appliances_total}</span><span class="label">Appliances fully solar-covered</span></div>
+                <div class="summary-stat"><span class="value">~${summary.estimated_kwh_saved} kWh</span><span class="label">Estimated grid energy saved</span></div>
+                <div class="summary-stat"><span class="value">~${summary.estimated_cost_saved.toLocaleString()}</span><span class="label">Estimated NGN saved</span></div>
+            </div>
+            <div class="summary-note">Savings are a rough estimate based on avoiding grid draw during covered windows, not a billing-accurate calculation.</div>
+        </div>
+    `;
+}
+
+function renderCards(recommendations) {
+    const container = document.getElementById("cards");
+    container.innerHTML = "";
+    for (const [appliance, window] of Object.entries(recommendations)) {
+        const card = document.createElement("div");
+        if (!window) {
+            card.className = "result-card";
+            card.innerHTML = `<h3>${appliance.replace(/_/g, " ")}</h3><div class="window">No window found</div>`;
+            container.appendChild(card);
+            continue;
+        }
+        const startTime = window.start_time.split(" ")[1]?.slice(0, 5) || window.start_time;
+        const endTime = window.end_time.split(" ")[1]?.slice(0, 5) || window.end_time;
+        
+        const solar = window.solar_pct || 0;
+        const battery = window.battery_pct || 0;
+        const grid = window.grid_pct || (100 - solar - battery);
+
+        let statusClass, statusText;
+        if (grid === 0) {
+            statusClass = "covered";
+            if (battery > 0 && solar > 0) statusText = `Powered by Solar (${solar}%) & Battery (${battery}%)`;
+            else if (battery > 0) statusText = `Fully powered by Battery`;
+            else statusText = `Fully powered by Solar`;
+        } else if (solar > 0 || battery > 0) {
+            statusClass = "partial";
+            let parts = [];
+            if (solar > 0) parts.push(`Solar ${solar}%`);
+            if (battery > 0) parts.push(`Battery ${battery}%`);
+            statusText = `${parts.join(", ")} -- Grid ${grid}%`;
+        } else {
+            statusClass = "grid-needed";
+            statusText = "No solar/battery available -- Grid needed";
+        }
+
+        let windowDisplay = `${startTime} - ${endTime}`;
+        if (solar === 0) {
+            windowDisplay = "Flexible / Anytime";
+        }
+
+        card.className = "result-card " + statusClass;
+        card.innerHTML = `
+            <h3>${appliance.replace(/_/g, " ")}</h3>
+            <div class="window">${windowDisplay}</div>
+            <div class="status">${statusText}</div>
+        `;
+        container.appendChild(card);
+    }
+}
+
+function renderChart(dayData) {
+    const labels = dayData.map(r => r.timestamp.split(" ")[1]?.slice(0, 5) || r.timestamp);
+    const load = dayData.map(r => r.predicted_nonflex_kW);
+    const pv = dayData.map(r => r.predicted_pv_kW);
+    const surplus = dayData.map(r => r.surplus_kW);
+
+    const ctx = document.getElementById("energyChart").getContext("2d");
+    if (chart) chart.destroy();
+    
+    const isLight = document.body.classList.contains('light-theme');
+    const colors = {
+        text: isLight ? '#475569' : '#9aa0a6',
+        grid: isLight ? 'rgba(0,0,0,0.05)' : '#262b36',
+        load: isLight ? '#ef4444' : '#f43f5e',
+        pv: isLight ? '#f59e0b' : '#f59e0b',
+        surplus: isLight ? '#10b981' : '#34d399'
+    };
+
+    const gradientPV = ctx.createLinearGradient(0, 0, 0, 400);
+    gradientPV.addColorStop(0, isLight ? 'rgba(245,158,11,0.2)' : 'rgba(245,158,11,0.2)');
+    gradientPV.addColorStop(1, 'rgba(245,158,11,0)');
+
+    chart = new Chart(ctx, {
+        type: "line",
+        data: {
+            labels: labels,
+            datasets: [
+                { label: "Predicted Base+HVAC Load (kW)", data: load, borderColor: colors.load, borderWidth: 2, pointRadius: 0, tension: 0.4 },
+                { label: "Predicted PV (kW)", data: pv, borderColor: colors.pv, backgroundColor: gradientPV, fill: true, borderWidth: 2, pointRadius: 0, tension: 0.4 },
+                { label: "Surplus (kW)", data: surplus, borderColor: colors.surplus, borderWidth: 2, borderDash: [4, 4], pointRadius: 0, tension: 0.4 },
+            ]
+        },
+        options: {
+            responsive: true,
+            animation: { duration: 800, easing: 'easeOutQuart' },
+            interaction: { mode: 'index', intersect: false },
+            plugins: { 
+                legend: { labels: { color: colors.text, font: { family: 'Inter' } } },
+                tooltip: { backgroundColor: isLight ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.8)', titleColor: isLight ? '#000' : '#fff', bodyColor: isLight ? '#000' : '#fff', borderColor: colors.grid, borderWidth: 1 }
+            },
+            scales: {
+                x: { ticks: { color: colors.text }, grid: { color: colors.grid } },
+                y: { ticks: { color: colors.text }, grid: { color: colors.grid } }
+            }
+        }
+    });
+}
+
+function aggregateHourly(dayData) {
+    const hourlyStats = {};
+    dayData.forEach(r => {
+        const hourLabel = (r.timestamp.split(" ")[1] || "00:00").slice(0, 2);
+        if (!hourlyStats[hourLabel]) {
+            hourlyStats[hourLabel] = { solar: 0, battery: 0, grid: 0 };
+        }
+        hourlyStats[hourLabel].solar += (r.solar_used_kW || 0) * 0.25;
+        hourlyStats[hourLabel].battery += (r.battery_discharge_kW || 0) * 0.25;
+        hourlyStats[hourLabel].grid += (r.grid_import_kW || 0) * 0.25;
+    });
+    
+    return Object.keys(hourlyStats).sort().map(hour => ({
+        hour: hour + ":00",
+        solar: Math.round(hourlyStats[hour].solar * 100) / 100,
+        battery: Math.round(hourlyStats[hour].battery * 100) / 100,
+        grid: Math.round(hourlyStats[hour].grid * 100) / 100,
+    }));
+}
+
+function renderHourlyChart(dayData) {
+    const hourly = aggregateHourly(dayData);
+    
+    // Total generation for the header
+    const totalGen = dayData.reduce((sum, r) => sum + (r.predicted_pv_kW || 0) * 0.25, 0);
+    document.getElementById("totalGenLabel").textContent = `${totalGen.toFixed(2)} kWh`;
+
+    const ctx = document.getElementById("hourlyChart").getContext("2d");
+    if (hourlyChart) hourlyChart.destroy();
+    
+    const isLight = document.body.classList.contains('light-theme');
+    const colors = {
+        text: isLight ? '#475569' : '#9aa0a6',
+        gridLines: isLight ? 'rgba(0,0,0,0.05)' : '#262b36',
+        solar: isLight ? 'rgba(245, 158, 11, 0.9)' : 'rgba(245, 158, 11, 0.9)',
+        battery: isLight ? 'rgba(16, 185, 129, 0.9)' : 'rgba(16, 185, 129, 0.9)',
+        gridImport: isLight ? 'rgba(239, 68, 68, 0.9)' : 'rgba(239, 68, 68, 0.9)'
+    };
+    
+    hourlyChart = new Chart(ctx, {
+        type: "bar",
+        data: {
+            labels: hourly.map(h => h.hour),
+            datasets: [
+                { label: "Solar Energy Used (kWh)", data: hourly.map(h => h.solar), backgroundColor: colors.solar },
+                { label: "Battery Energy Used (kWh)", data: hourly.map(h => h.battery), backgroundColor: colors.battery },
+                { label: "Grid Energy Used (kWh)", data: hourly.map(h => h.grid), backgroundColor: colors.gridImport }
+            ]
+        },
+        options: {
+            responsive: true,
+            animation: { duration: 800, easing: 'easeOutQuart' },
+            interaction: { mode: 'index', intersect: false },
+            plugins: { 
+                legend: { labels: { color: colors.text, font: { family: 'Inter' } } },
+                tooltip: { 
+                    backgroundColor: isLight ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.8)', 
+                    titleColor: isLight ? '#000' : '#fff', bodyColor: isLight ? '#000' : '#fff', 
+                    borderColor: colors.gridLines, borderWidth: 1,
+                    callbacks: {
+                        label: function(context) { return context.dataset.label + ': ' + context.parsed.y.toFixed(2); }
+                    }
+                }
+            },
+            scales: {
+                x: { stacked: true, ticks: { color: colors.text }, grid: { display: false } },
+                y: { stacked: true, ticks: { color: colors.text }, grid: { color: colors.gridLines }, title: { display: true, text: "kWh", color: colors.text } }
+            }
+        }
+    });
+}
+
+window.addEventListener('themeChanged', () => {
+    if (currentData) {
+        renderChart(currentData.day_data);
+        renderHourlyChart(currentData.day_data);
+    }
+});
+</script>
+{% endblock %}

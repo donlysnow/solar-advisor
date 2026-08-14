@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}AI Advisor{% endblock %}
+{% block content %}
+
+<h1>AI Advisor</h1>
+<p class="lead">Ask about your solar forecast and appliance plan -- answers are grounded in your actual data, not guesses.</p>
+
+<div class="controls">
+    <div class="field-group" style="max-width:160px;">
+        <input id="latInput" type="text" value="6.5244">
+        <span>Latitude</span>
+    </div>
+    <div class="field-group" style="max-width:160px;">
+        <input id="lonInput" type="text" value="3.3792">
+        <span>Longitude</span>
+    </div>
+    <div class="field-group" style="max-width:140px;">
+        <input id="pvInput" type="text" value="4.0">
+        <span>Solar panel size (kW)</span>
+    </div>
+    <button class="blue" onclick="loadTips()">Get Summary</button>
+</div>
+
+<div id="loading" style="display:none;">Thinking...</div>
+<div id="sourceNote" style="font-size:11px; color:var(--text-dim); margin-bottom:10px;"></div>
+<div id="responseContainer"></div>
+
+<div class="controls" style="margin-top:24px;">
+    <div class="field-group" style="flex:1; max-width:500px;">
+        <input id="questionInput" type="text" placeholder="Ask a follow-up question...">
+        <span>Your question</span>
+    </div>
+    <button onclick="askQuestion()">Ask</button>
+</div>
+
+<script>
+async function loadSavedSettings() {
+    const res = await fetch("/api/live-settings");
+    const data = await res.json();
+    if (data.lat) document.getElementById("latInput").value = data.lat;
+    if (data.lon) document.getElementById("lonInput").value = data.lon;
+    if (data.pv_capacity) document.getElementById("pvInput").value = data.pv_capacity;
+}
+document.addEventListener("DOMContentLoaded", loadSavedSettings);
+
+function currentSettings() {
+    return {
+        lat: parseFloat(document.getElementById("latInput").value) || 6.5244,
+        lon: parseFloat(document.getElementById("lonInput").value) || 3.3792,
+        pv_capacity: parseFloat(document.getElementById("pvInput").value) || 4.0,
+    };
+}
+
+async function runAdvisor(question) {
+    document.getElementById("loading").style.display = "block";
+
+    const res = await fetch("/api/advisor-tips", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...currentSettings(), question }),
+    });
+    const data = await res.json();
+    document.getElementById("loading").style.display = "none";
+
+    if (data.error) {
+        document.getElementById("responseContainer").innerHTML = `<div class="panel">${data.error}</div>`;
+        return;
+    }
+
+    const sourceNote = document.getElementById("sourceNote");
+    sourceNote.textContent = data.source === "ai"
+        ? "Answered by AI (Groq / Llama 3.3), grounded in your forecast data."
+        : "Offline mode -- no API key configured, or the AI service is unreachable. Showing rule-based tips instead.";
+
+    const container = document.getElementById("responseContainer");
+    if (data.source === "ai") {
+        const bubble = document.createElement("div");
+        bubble.className = "panel";
+        bubble.style.borderLeft = "4px solid var(--accent-blue)";
+        bubble.innerHTML = `<p style="margin:0; font-size:14px; line-height:1.7; white-space:pre-wrap;">${data.result}</p>`;
+        if (question) container.appendChild(bubble); else container.innerHTML = "";
+        if (question) container.appendChild(bubble); else container.appendChild(bubble);
+    } else {
+        container.innerHTML = data.result.map(tip => `
+            <div class="panel" style="border-left: 4px solid var(--accent);">
+                <p style="margin:0; font-size:14px; line-height:1.6;">${tip}</p>
+            </div>
+        `).join("");
+    }
+}
+
+function loadTips() {
+    runAdvisor(null);
+}
+
+function askQuestion() {
+    const q = document.getElementById("questionInput").value.trim();
+    if (!q) return;
+    runAdvisor(q);
+    document.getElementById("questionInput").value = "";
+}
+
+loadTips();
+</script>
+{% endblock %}
