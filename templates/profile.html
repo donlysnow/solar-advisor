@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}My Profile{% endblock %}
+{% block content %}
+<div class="panel">
+    <h1>My Profile</h1>
+    <div style="margin-bottom: 20px;">
+        <p><strong>Name:</strong> {{ current_user.name }}</p>
+        <p><strong>Email:</strong> {{ current_user.email }}</p>
+        <p><strong>Joined:</strong> Member since 2026</p>
+    </div>
+
+    <div class="controls" style="margin-bottom: 30px;">
+        <h3>Financial Preferences</h3>
+        <div class="field-group" style="max-width: 250px;">
+            <input type="number" id="profileElectricityRate" value="{{ current_user.electricity_rate }}" step="0.1">
+            <span>Electricity Tariff ({{ current_user.currency }}/kWh)</span>
+        </div>
+        <button class="btn" style="margin-top: 10px;" onclick="saveProfileSettings()">Save Preferences</button>
+        <div id="profileSaveStatus" style="color:var(--accent); margin-top:5px; font-size:13px;"></div>
+    </div>
+
+    <h3>My Badges</h3>
+    <p class="lead" style="margin-bottom:20px;">Use the Solar app efficiently to earn badges and gamify your energy usage!</p>
+    
+    <div style="display:flex; flex-wrap:wrap; gap:15px; margin-bottom: 20px;">
+        {% if current_user.badges %}
+            {% for badge in current_user.badges %}
+            <div style="background:var(--bg-color); border:1px solid var(--border); border-radius:8px; padding:15px; text-align:center; min-width:120px;">
+                <div style="font-size:36px; margin-bottom:10px;">
+                    {% if badge.badge_name == 'First Plan' %} 🗓️
+                    {% elif badge.badge_name == 'Perfect Solar Day' %} ☀️
+                    {% elif badge.badge_name == 'Off-Grid Master' %} 🔋
+                    {% elif badge.badge_name == 'Night Owl' %} 🦉
+                    {% else %} 🏆 {% endif %}
+                </div>
+                <div style="font-weight:600; color:var(--text-color); margin-bottom:5px;">{{ badge.badge_name }}</div>
+                <div style="font-size:11px; color:var(--text-dim);">Earned: {{ badge.date_earned.strftime('%b %d, %Y') }}</div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div style="color:var(--text-dim); font-size:14px; font-style:italic;">
+                No badges yet! Check your Live Recommendations for a Perfect Solar Day to earn your first.
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+async function saveProfileSettings() {
+    const rate = document.getElementById("profileElectricityRate").value;
+    try {
+        await fetch("/api/live-settings", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ electricity_rate: rate })
+        });
+        document.getElementById("profileSaveStatus").textContent = "Preferences saved!";
+        setTimeout(() => document.getElementById("profileSaveStatus").textContent = "", 3000);
+    } catch(e) {
+        document.getElementById("profileSaveStatus").textContent = "Failed to save.";
+    }
+}
+</script>
+{% endblock %}

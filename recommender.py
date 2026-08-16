@@ -207,50 +207,49 @@ def recommend_schedule_multiday(forecast_df, appliances, battery=None, current_t
     return df, all_recommendations
 
 
-def summarize_day(df_day, recommendations, appliances):
-    total_pv_kWh = float(df_day["predicted_pv_kW"].sum()) * 0.25
+def summarize_day(df_day, final_schedule, appliances, electricity_rate=225.0):
+    total_pv_kWh_today = float(df_day["predicted_pv_kW"].sum() * 0.25)
     peak_pv = float(df_day["predicted_pv_kW"].max())
     peak_time = df_day.loc[df_day["predicted_pv_kW"].idxmax(), config.TIMESTAMP_COL]
 
     if peak_pv <= 1.0:
-        quality = "poor"
+        solar_quality = "poor"
         headline = "Low solar output expected today -- most appliances will need battery or grid support."
     elif peak_pv < 3.0:
-        quality = "fair"
+        solar_quality = "fair"
         headline = f"Modest solar expected today, peaking around {peak_time.strftime('%H:%M')}."
     else:
-        quality = "good"
+        solar_quality = "good"
         headline = f"Good solar day -- peak output of {peak_pv:.1f} kW expected around {peak_time.strftime('%H:%M')}."
 
-    fully_covered_count = 0
+    appliances_covered = 0
     estimated_kwh_saved = 0.0
-    
-    appliance_lookup = {a["name"]: a for a in appliances}
 
-    for appliance_name, window in recommendations.items():
-        if not window:
+    for name, w in final_schedule.items():
+        if not w:
             continue
-        if window.get("grid_pct", 100) == 0:
-            fully_covered_count += 1
-            
-        cfg = appliance_lookup.get(appliance_name)
-        if cfg:
-            run_hours = cfg["duration_minutes"] / 60.0
-            full_energy = cfg["typical_power_kW"] * run_hours
-            
-            # Money saved is from Solar AND Battery usage
-            coverage_fraction = (window.get("solar_pct", 0) + window.get("battery_pct", 0)) / 100.0
-            estimated_kwh_saved += full_energy * coverage_fraction
+        if w["grid_pct"] == 0:
+            appliances_covered += 1
 
-    estimated_cost_saved = estimated_kwh_saved * config.DEFAULT_GRID_PRICE_PER_KWH
+        app_info = next((a for a in appliances if a["name"] == name), None)
+        if app_info:
+            dur_h = app_info["duration_minutes"] / 60.0
+            power = app_info["typical_power_kW"]
+            total_req = dur_h * power
+            
+            coverage_fraction = (w.get("solar_pct", 0) + w.get("battery_pct", 0)) / 100.0
+            saved = total_req * coverage_fraction
+            estimated_kwh_saved += saved
+
+    estimated_cost_saved = estimated_kwh_saved * electricity_rate
 
     return {
-        "solar_quality": quality,
+        "solar_quality": solar_quality,
         "headline": headline,
-        "total_pv_kWh_today": round(total_pv_kWh, 2),
-        "appliances_covered": fully_covered_count,
-        "appliances_total": len(recommendations),
-        "estimated_kwh_saved": round(estimated_kwh_saved, 2),
+        "total_pv_kWh_today": round(total_pv_kWh_today, 1),
+        "appliances_covered": appliances_covered,
+        "appliances_total": len(appliances),
+        "estimated_kwh_saved": round(estimated_kwh_saved, 1),
         "estimated_cost_saved": round(estimated_cost_saved, 0),
     }
 

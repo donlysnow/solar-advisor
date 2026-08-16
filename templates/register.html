@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Register{% endblock %}
+{% block content %}
+<div class="panel" style="max-width:400px; margin:40px auto; text-align:center;">
+    <h2>Create an Account</h2>
+    
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div style="color: #ef4444; margin-bottom:15px; font-weight:bold;">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST" action="{{ url_for('register') }}" style="display:flex; flex-direction:column; gap:15px; text-align:left;">
+        <div>
+            <label style="display:block; margin-bottom:5px; color:var(--text-dim);">Name</label>
+            <input type="text" name="name" required style="width:100%; padding:12px; background:var(--input-bg); border:1px solid var(--border); color:var(--text-color); border-radius:8px;">
+        </div>
+        <div>
+            <label style="display:block; margin-bottom:5px; color:var(--text-dim);">Email Address</label>
+            <input type="email" name="email" required style="width:100%; padding:12px; background:var(--input-bg); border:1px solid var(--border); color:var(--text-color); border-radius:8px;">
+        </div>
+        <div>
+            <label style="display:block; margin-bottom:5px; color:var(--text-dim);">Password</label>
+            <input type="password" name="password" required style="width:100%; padding:12px; background:var(--input-bg); border:1px solid var(--border); color:var(--text-color); border-radius:8px;">
+        </div>
+        <button type="submit" class="btn" style="width:100%; justify-content:center; margin-top:10px;">Register</button>
+    </form>
+    
+    <div style="margin-top:20px; color:var(--text-dim);">
+        Already have an account? <a href="{{ url_for('login') }}" style="color:var(--accent-blue);">Login</a>
+    </div>
+</div>
+{% endblock %}

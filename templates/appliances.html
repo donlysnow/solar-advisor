@@ -101,6 +101,7 @@ function addRow(a) {
     row.dataset.active = a.active ? "true" : "false";
     row.style.opacity = a.active ? "1" : "0.45";
     row.innerHTML = `
+        <div class="drag-handle" style="cursor:grab; font-size:20px; color:var(--text-dim); padding-right:10px;">☰</div>
         <div class="field-group name-field">
             <input class="name" type="text" placeholder="e.g. table fan" value="${a.name}">
             <span>Appliance name</span>
@@ -198,6 +199,15 @@ async function saveAppliances() {
 }
 
 renderLibrary();
-document.addEventListener("DOMContentLoaded", loadAppliances);
+document.addEventListener("DOMContentLoaded", () => {
+    loadAppliances().then(() => {
+        new Sortable(document.getElementById("applianceRows"), {
+            animation: 150,
+            handle: '.drag-handle',
+            ghostClass: 'sortable-ghost'
+        });
+    });
+});
 </script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 {% endblock %}

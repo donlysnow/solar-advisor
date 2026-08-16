@@ -40,11 +40,21 @@
             <input id="panelWattInput" type="number" placeholder="e.g. 400">
             <span>Watts per panel</span>
         </div>
+
+
+        <button class="btn" style="width:100%; justify-content:center; margin-top:20px;" onclick="saveSettings()">Save & Recalculate</button>
         <button class="secondary" onclick="calcPanelKw()">Calculate and fill in</button>
     </div>
 </div>
 
 <div class="panel" style="margin-bottom:16px;">
+    <!-- Financial Settings -->
+    <div class="controls" style="margin-bottom:12px;">
+        <div class="field-group" style="max-width:200px;">
+            <input id="electricityRate" type="text" value="225.0">
+            <span>Electricity Tariff (Price/kWh)</span>
+        </div>
+    </div>
     <label style="font-size:13px; display:flex; align-items:center; gap:8px;">
         <input type="checkbox" id="advancedToggle" onchange="toggleAdvanced()" style="width:auto;">
         Show advanced settings (system losses, battery)
@@ -170,6 +180,7 @@ async function loadSavedSettings() {
     if (data.lat) document.getElementById("latInput").value = data.lat;
     if (data.lon) document.getElementById("lonInput").value = data.lon;
     if (data.pv_capacity) document.getElementById("pvInput").value = data.pv_capacity;
+    if (data.electricity_rate) document.getElementById("electricityRate").value = data.electricity_rate;
     if (data.background_load_kW !== undefined) document.getElementById("backgroundLoadInput").value = data.background_load_kW;
     if (data.system_loss_pct !== undefined) document.getElementById("systemLossInput").value = data.system_loss_pct;
     if (data.battery_enabled) {
@@ -234,6 +245,7 @@ async function loadLiveRecommendations() {
     const pvCapacity = parseFloat(document.getElementById("pvInput").value) || 4.0;
     const backgroundLoad = parseFloat(document.getElementById("backgroundLoadInput").value) || 0.3;
     const systemLossPct = parseFloat(document.getElementById("systemLossInput").value) || 0;
+    const electricityRate = parseFloat(document.getElementById("electricityRate").value) || 225.0;
 
     let battery = null;
     if (document.getElementById("batteryToggle").checked) {
@@ -247,7 +259,7 @@ async function loadLiveRecommendations() {
 
     const settingsPayload = {
         lat, lon, pv_capacity: pvCapacity, background_load_kW: backgroundLoad,
-        system_loss_pct: systemLossPct, battery_enabled: !!battery,
+        system_loss_pct: systemLossPct, electricity_rate: electricityRate, battery_enabled: !!battery,
         battery_capacity_kWh: battery?.capacity_kWh, battery_charge_rate_kW: battery?.charge_rate_kW,
         battery_discharge_rate_kW: battery?.discharge_rate_kW, battery_initial_soc_pct: battery?.initial_soc_pct,
     };

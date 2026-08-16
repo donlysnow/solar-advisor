@@ -1,6 +1,10 @@
-from flask import Flask, jsonify, request, render_template, session, send_from_directory
+from flask import Flask, jsonify, request, render_template, session, send_from_directory, redirect, url_for, flash
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+from flask_bcrypt import Bcrypt
 import pandas as pd
 from datetime import datetime
+import json
+import os
 
 import config
 from recommender import (
@@ -14,10 +18,26 @@ from live_forecast import (
 import live_logs
 import advisor
 from battery import simulate_battery
+from models import db, User, UserBadge, DailyLog
 
 app = Flask(__name__)
 app.secret_key = "solar_secret_key"
 DATA_DIR = "data"
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///solar_advisor.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+db.init_app(app)
+bcrypt = Bcrypt(app)
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+with app.app_context():
+    db.create_all()
 
 @app.route('/sw.js')
 def serve_sw():
@@ -36,7 +56,7 @@ def get_session_appliances():
 
 
 def compute_multiday(latitude, longitude, pv_capacity_kW, background_load_kW,
-                      appliances, forecast_days=3, system_loss_pct=0, battery=None):
+                      appliances, forecast_days=3, system_loss_pct=0, battery=None, electricity_rate=225.0):
     forecast_df = build_forecast_row_set(latitude, longitude, pv_capacity_kW, days=forecast_days)
     forecast_df = forecast_df.dropna(subset=["solar_irradiance_lag_96"])
     if forecast_df.empty:
@@ -70,7 +90,7 @@ def compute_multiday(latitude, longitude, pv_capacity_kW, background_load_kW,
     for i, (cal_date, df_day) in enumerate(final_df.groupby("cal_date", sort=True)):
         date_str = str(cal_date)
         recs = all_recs.get(date_str, {})
-        summary = summarize_day(df_day, recs, appliances)
+        summary = summarize_day(df_day, recs, appliances, electricity_rate=electricity_rate)
 
         serializable_recs = {
             appliance: (
@@ -113,6 +133,48 @@ def compute_multiday(latitude, longitude, pv_capacity_kW, background_load_kW,
 
     return days_out
 
+
+# ---------------- Auth Pages ----------------
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "POST":
+        name = request.form.get("name")
+        email = request.form.get("email")
+        password = request.form.get("password")
+        if User.query.filter_by(email=email).first():
+            flash("Email already registered", "danger")
+            return redirect(url_for('register'))
+        hashed_pw = bcrypt.generate_password_hash(password).decode('utf-8')
+        new_user = User(name=name, email=email, password=hashed_pw)
+        db.session.add(new_user)
+        db.session.commit()
+        login_user(new_user)
+        return redirect(url_for('home'))
+    return render_template("register.html")
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        email = request.form.get("email")
+        password = request.form.get("password")
+        user = User.query.filter_by(email=email).first()
+        if user and bcrypt.check_password_hash(user.password, password):
+            login_user(user)
+            return redirect(url_for('home'))
+        else:
+            flash("Login Unsuccessful. Please check email and password", "danger")
+    return render_template("login.html")
+
+@app.route("/logout")
+def logout():
+    logout_user()
+    return redirect(url_for('home'))
+
+@app.route("/profile")
+@login_required
+def profile():
+    return render_template("profile.html", active="profile")
 
 # ---------------- Pages ----------------
 
@@ -172,7 +234,7 @@ def save_appliances():
 
 @app.route("/api/live-settings", methods=["GET"])
 def get_live_settings():
-    settings = session.get("live_settings", {
+    default_settings = {
         "lat": config.DEFAULT_LATITUDE,
         "lon": config.DEFAULT_LONGITUDE,
         "pv_capacity": 4.0,
@@ -183,14 +245,33 @@ def get_live_settings():
         "battery_charge_rate_kW": config.DEFAULT_BATTERY_CHARGE_RATE_KW,
         "battery_discharge_rate_kW": config.DEFAULT_BATTERY_DISCHARGE_RATE_KW,
         "battery_initial_soc_pct": config.DEFAULT_BATTERY_INITIAL_SOC_PCT,
-    })
+        "electricity_rate": 225.0
+    }
+    
+    if current_user.is_authenticated:
+        try:
+            user_settings = json.loads(current_user.live_settings)
+            user_settings["electricity_rate"] = current_user.electricity_rate
+            return jsonify({**default_settings, **user_settings})
+        except:
+            return jsonify(default_settings)
+            
+    settings = session.get("live_settings", default_settings)
     return jsonify(settings)
 
 
 @app.route("/api/live-settings", methods=["POST"])
 def save_live_settings():
     body = request.get_json(silent=True) or {}
-    session["live_settings"] = body
+    
+    if current_user.is_authenticated:
+        if "electricity_rate" in body:
+            current_user.electricity_rate = float(body.pop("electricity_rate"))
+        current_user.live_settings = json.dumps(body)
+        db.session.commit()
+    else:
+        session["live_settings"] = body
+        
     return jsonify(body)
 
 
@@ -291,13 +372,14 @@ def live_recommendations():
     pv_capacity_kW = body.get("pv_capacity", 4.0)
     background_load_kW = body.get("background_load_kW", config.DEFAULT_BACKGROUND_LOAD_KW)
     system_loss_pct = body.get("system_loss_pct", 0)
+    electricity_rate = body.get("electricity_rate", 225.0)
     battery = body.get("battery")
     appliances = get_session_appliances()
 
     try:
         days_out = compute_multiday(
             latitude, longitude, pv_capacity_kW, background_load_kW, appliances,
-            forecast_days=1, system_loss_pct=system_loss_pct, battery=battery,
+            forecast_days=1, system_loss_pct=system_loss_pct, battery=battery, electricity_rate=electricity_rate,
         )
     except (ValueError, RuntimeError) as e:
         return jsonify({"error": str(e)}), 500
@@ -311,6 +393,26 @@ def live_recommendations():
         pv_capacity_kW=pv_capacity_kW, summary=today["summary"],
         recommendations=today["recommendations"], day_data=today["day_data"],
     )
+
+    if current_user.is_authenticated:
+        # Gamification: Grant badges
+        existing_badges = {b.badge_name for b in current_user.badges}
+        
+        def grant_badge(name):
+            if name not in existing_badges:
+                new_badge = UserBadge(user_id=current_user.id, badge_name=name)
+                db.session.add(new_badge)
+                existing_badges.add(name)
+
+        grant_badge("First Plan")
+        
+        if today["summary"].get("solar_quality") == "good":
+            grant_badge("Perfect Solar Day")
+            
+        if today["battery_enabled"]:
+            grant_badge("Off-Grid Master")
+            
+        db.session.commit()
 
     return jsonify({
         "latitude": latitude, "longitude": longitude, "pv_capacity_kW": pv_capacity_kW,
@@ -330,6 +432,7 @@ def live_recommendations_multiday():
     pv_capacity_kW = body.get("pv_capacity", 4.0)
     background_load_kW = body.get("background_load_kW", config.DEFAULT_BACKGROUND_LOAD_KW)
     system_loss_pct = body.get("system_loss_pct", 0)
+    electricity_rate = body.get("electricity_rate", 225.0)
     battery = body.get("battery")
     forecast_days = body.get("days", 3)
     appliances = get_session_appliances()
@@ -337,7 +440,7 @@ def live_recommendations_multiday():
     try:
         days_out = compute_multiday(
             latitude, longitude, pv_capacity_kW, background_load_kW, appliances,
-            forecast_days=forecast_days, system_loss_pct=system_loss_pct, battery=battery,
+            forecast_days=forecast_days, system_loss_pct=system_loss_pct, battery=battery, electricity_rate=electricity_rate,
         )
     except (ValueError, RuntimeError) as e:
         return jsonify({"error": str(e)}), 500
@@ -350,6 +453,26 @@ def live_recommendations_multiday():
         pv_capacity_kW=pv_capacity_kW, summary=today["summary"],
         recommendations=today["recommendations"], day_data=today["day_data"],
     )
+
+    if current_user.is_authenticated:
+        # Gamification: Grant badges
+        existing_badges = {b.badge_name for b in current_user.badges}
+        
+        def grant_badge(name):
+            if name not in existing_badges:
+                new_badge = UserBadge(user_id=current_user.id, badge_name=name)
+                db.session.add(new_badge)
+                existing_badges.add(name)
+
+        grant_badge("First Plan")
+        
+        if today["summary"].get("solar_quality") == "good":
+            grant_badge("Perfect Solar Day")
+            
+        if today["battery_enabled"]:
+            grant_badge("Off-Grid Master")
+            
+        db.session.commit()
 
     return jsonify({
         "latitude": latitude, "longitude": longitude, "pv_capacity_kW": pv_capacity_kW,

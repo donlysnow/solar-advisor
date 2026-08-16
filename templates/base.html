@@ -28,8 +28,15 @@
     <a class="nav-link {% if active == 'historical' %}active{% endif %}" href="{{ url_for('historical_page') }}">📊 Historical</a>
     <a class="nav-link {% if active == 'about' %}active{% endif %}" href="{{ url_for('about_page') }}">❓ How It Works</a>
     
-    <div style="flex: 1;"></div>
+    <div style="flex-grow: 1;"></div>
     
+    {% if current_user.is_authenticated %}
+        <a class="nav-link {% if active == 'profile' %}active{% endif %}" href="{{ url_for('profile') }}">👤 My Profile</a>
+        <a class="nav-link" href="{{ url_for('logout') }}" style="color: #ef4444;">🚪 Logout</a>
+    {% else %}
+        <a class="nav-link {% if active == 'login' %}active{% endif %}" href="{{ url_for('login') }}">🔐 Login</a>
+    {% endif %}
+
     <button id="themeToggle" style="margin-bottom: 20px; background: transparent; border: 1px solid var(--border); box-shadow: none; color: var(--text-dim); justify-content: flex-start; gap: 12px; width: 100%;">
         <span class="icon">🌙</span> <span class="label">Dark Mode</span>
     </button>
@@ -192,34 +199,37 @@
 
 <script>
 // --- Theme Toggle Logic ---
-const themeToggle = document.getElementById('themeToggle');
-const body = document.body;
+const btn = document.getElementById('themeToggle');
 
-function setTheme(isLight) {
+function applyTheme(isLight) {
     if (isLight) {
-        body.classList.add('light-theme');
-        themeToggle.querySelector('.icon').textContent = '☀️';
-        themeToggle.querySelector('.label').textContent = 'Light Mode';
-        localStorage.setItem('solar_theme', 'light');
+        document.body.classList.add('light-theme');
+        btn.innerHTML = '<span class="icon">☀️</span> <span class="label">Light Mode</span>';
+        localStorage.setItem('theme', 'light');
     } else {
-        body.classList.remove('light-theme');
-        themeToggle.querySelector('.icon').textContent = '🌙';
-        themeToggle.querySelector('.label').textContent = 'Dark Mode';
-        localStorage.setItem('solar_theme', 'dark');
+        document.body.classList.remove('light-theme');
+        btn.innerHTML = '<span class="icon">🌙</span> <span class="label">Dark Mode</span>';
+        localStorage.setItem('theme', 'dark');
     }
-    
-    // Dispatch an event so Chart.js components can redraw
     window.dispatchEvent(new Event('themeChanged'));
 }
 
-// Check saved preference
-if (localStorage.getItem('solar_theme') === 'light') {
-    setTheme(true);
+let savedTheme = localStorage.getItem('theme');
+if (!savedTheme) {
+    // Auto day/night based on time (6 AM to 6 PM is light mode)
+    const hour = new Date().getHours();
+    if (hour >= 6 && hour < 18) {
+        savedTheme = 'light';
+    } else {
+        savedTheme = 'dark';
+    }
 }
 
-themeToggle.addEventListener('click', () => {
-    const isLight = !body.classList.contains('light-theme');
-    setTheme(isLight);
+applyTheme(savedTheme === 'light');
+
+btn.addEventListener('click', () => {
+    const willBeLight = !document.body.classList.contains('light-theme');
+    applyTheme(willBeLight);
 });
 
 // --- Toast Notification System ---
