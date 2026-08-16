@@ -548,5 +548,44 @@ def voice_command():
         
     return jsonify(result)
 
+# ---------------- Push Notifications ----------------
+
+@app.route("/api/vapid-public-key", methods=["GET"])
+def vapid_public_key():
+    return jsonify({"publicKey": config.VAPID_PUBLIC_KEY})
+
+
+@app.route("/api/subscribe", methods=["POST"])
+@login_required
+def subscribe():
+    subscription = request.get_json()
+    if not subscription:
+        return jsonify({"error": "No subscription data"}), 400
+    
+    current_user.push_subscription = json.dumps(subscription)
+    db.session.commit()
+    return jsonify({"success": True})
+
+
+@app.route("/api/test-push", methods=["POST"])
+@login_required
+def test_push():
+    if not current_user.push_subscription:
+        return jsonify({"error": "User not subscribed"}), 400
+        
+    try:
+        from pywebpush import webpush, WebPushException
+        subscription = json.loads(current_user.push_subscription)
+        webpush(
+            subscription_info=subscription,
+            data=json.dumps({"title": "Solar Advisor", "body": "This is a test notification!"}),
+            vapid_private_key=config.VAPID_PRIVATE_KEY,
+            vapid_claims=config.VAPID_CLAIMS
+        )
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

@@ -69,3 +69,12 @@ DEFAULT_BATTERY_CAPACITY_KWH = 5.0
 DEFAULT_BATTERY_CHARGE_RATE_KW = 2.0
 DEFAULT_BATTERY_DISCHARGE_RATE_KW = 2.0
 DEFAULT_BATTERY_INITIAL_SOC_PCT = 50
+
+# ---------------------------------------------------------
+# Push Notification VAPID Keys
+# ---------------------------------------------------------
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "BDgQSK93TW6AVS1z1JWfgD2KcacWfx1HRkaHnzs3TaEFrcCTMpGz0HXfVAcOYOgrVQFTZua0WGXG8ySxI3QRpmc")
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "s7Ji9etMhlDrQscKKVQIqSPbvCaZSQTvDdQSIzl-15U")
+VAPID_CLAIMS = {
+    "sub": "mailto:admin@solar-advisor.com"
+}

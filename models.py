@@ -18,6 +18,7 @@ class User(UserMixin, db.Model):
     # Preferences stored as JSON
     live_settings = db.Column(db.Text, default='{}')
     appliances = db.Column(db.Text, default='[]')
+    push_subscription = db.Column(db.Text, nullable=True)
     
     # Relationships
     badges = db.relationship('UserBadge', backref='user', lazy=True)
