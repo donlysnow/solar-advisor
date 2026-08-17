@@ -23,7 +23,12 @@ from models import db, User, UserBadge, DailyLog
 app = Flask(__name__)
 app.secret_key = "solar_secret_key"
 DATA_DIR = "data"
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///solar_advisor.db'
+# Render uses ephemeral disks on the free tier, which means SQLite databases get wiped when the server restarts.
+# By using DATABASE_URL, we can connect a free PostgreSQL database (like Supabase or Render Postgres) later!
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL", "sqlite:///solar_advisor.db")
+# Fix for some postgres URIs that start with postgres:// instead of postgresql://
+if app.config['SQLALCHEMY_DATABASE_URI'].startswith("postgres://"):
+    app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace("postgres://", "postgresql://", 1)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)

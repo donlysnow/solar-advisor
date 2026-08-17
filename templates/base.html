@@ -117,7 +117,7 @@
         let recognition = null;
         if ('webkitSpeechRecognition' in window) {
             recognition = new webkitSpeechRecognition();
-            recognition.continuous = false;
+            recognition.continuous = true;
             recognition.interimResults = false;
             
             recognition.onstart = function() {
@@ -126,9 +126,10 @@
             };
             
             recognition.onresult = async function(event) {
-                const transcript = event.results[0][0].transcript;
+                // Get the last result since it's continuous
+                const last = event.results.length - 1;
+                const transcript = event.results[last][0].transcript;
                 showStatus(`You: "${transcript}"`);
-                voiceBtn.classList.remove('listening');
                 
                 try {
                     const res = await fetch('/api/voice-command', {
@@ -142,7 +143,7 @@
                         showStatus(`AI: ${data.message}`);
                         speakText(data.message);
                         
-                        // If they added an appliance, we might want to refresh the live page if we are on it
+                        // If they added an appliance, refresh live page
                         if (data.action === "ADD_APPLIANCE" && window.location.pathname === '/live') {
                             setTimeout(() => window.location.reload(), 2000);
                         }
@@ -155,11 +156,15 @@
             };
             
             recognition.onerror = function(event) {
-                voiceBtn.classList.remove('listening');
-                showStatus("Microphone error. Try again.");
+                // Only stop listening if there's a serious error
+                if (event.error !== 'no-speech') {
+                    voiceBtn.classList.remove('listening');
+                    showStatus("Microphone error. Try again.");
+                }
             };
             
             recognition.onend = function() {
+                // If it ends naturally or from error, remove listening class
                 voiceBtn.classList.remove('listening');
             };
         } else {

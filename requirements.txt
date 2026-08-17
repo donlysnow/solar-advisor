@@ -10,3 +10,4 @@ Flask-SQLAlchemy
 Flask-Login
 Flask-Bcrypt
 pywebpush
+psycopg2-binary
