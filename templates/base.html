@@ -115,6 +115,18 @@
         const voiceStatus = document.getElementById('voiceStatus');
         
         let recognition = null;
+        let silenceTimer = null;
+
+        function resetSilenceTimer() {
+            if (silenceTimer) clearTimeout(silenceTimer);
+            silenceTimer = setTimeout(() => {
+                if (recognition) {
+                    showStatus("Turning off (8s silence)...");
+                    recognition.stop();
+                }
+            }, 8000);
+        }
+
         if ('webkitSpeechRecognition' in window) {
             recognition = new webkitSpeechRecognition();
             recognition.continuous = true;
@@ -123,9 +135,11 @@
             recognition.onstart = function() {
                 voiceBtn.classList.add('listening');
                 showStatus("Listening...");
+                resetSilenceTimer();
             };
             
             recognition.onresult = async function(event) {
+                resetSilenceTimer();
                 // Get the last result since it's continuous
                 const last = event.results.length - 1;
                 const transcript = event.results[last][0].transcript;
@@ -160,12 +174,14 @@
                 if (event.error !== 'no-speech') {
                     voiceBtn.classList.remove('listening');
                     showStatus("Microphone error. Try again.");
+                    if (silenceTimer) clearTimeout(silenceTimer);
                 }
             };
             
             recognition.onend = function() {
                 // If it ends naturally or from error, remove listening class
                 voiceBtn.classList.remove('listening');
+                if (silenceTimer) clearTimeout(silenceTimer);
             };
         } else {
             voiceBtn.style.display = 'none'; // Hide if unsupported
