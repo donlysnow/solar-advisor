@@ -5,6 +5,7 @@ import pandas as pd
 from datetime import datetime
 import json
 import os
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 import config
 from recommender import (
@@ -21,6 +22,8 @@ from battery import simulate_battery
 from models import db, User, UserBadge, DailyLog
 
 app = Flask(__name__)
+# Tell Flask it is behind a proxy (like Render) so it gets the real IP and doesn't drop sessions
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 app.secret_key = "solar_secret_key"
 DATA_DIR = "data"
 # Render uses ephemeral disks on the free tier, which means SQLite databases get wiped when the server restarts.
