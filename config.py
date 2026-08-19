@@ -1,7 +1,7 @@
 import os
 import os as _os 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_MODEL = "groq/compound"
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 # Fill in the path to your downloaded Kaggle CSV
 DATA_PATH = "C:/Users/sambo/Downloads/HEMS_dataset.csv"
