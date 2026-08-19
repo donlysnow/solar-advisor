@@ -34,6 +34,12 @@ if app.config['SQLALCHEMY_DATABASE_URI'].startswith("postgres://"):
     app.config['SQLALCHEMY_DATABASE_URI'] = app.config['SQLALCHEMY_DATABASE_URI'].replace("postgres://", "postgresql://", 1)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# Secure cookies for Render HTTPS
+if os.environ.get("RENDER"):
+    app.config['SESSION_COOKIE_SECURE'] = True
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
 db.init_app(app)
 bcrypt = Bcrypt(app)
 login_manager = LoginManager()
@@ -46,6 +52,12 @@ def load_user(user_id):
 
 with app.app_context():
     db.create_all()
+
+@app.before_request
+def require_login():
+    allowed_routes = ['login', 'register', 'serve_sw', 'static']
+    if request.endpoint not in allowed_routes and not current_user.is_authenticated:
+        return redirect(url_for('login'))
 
 @app.route('/sw.js')
 def serve_sw():
