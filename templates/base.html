@@ -92,8 +92,8 @@
             position: fixed;
             bottom: 100px;
             right: 30px;
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
+            background: var(--bg-elevated);
+            color: var(--text);
             padding: 10px 20px;
             border-radius: 8px;
             font-size: 14px;
@@ -102,11 +102,8 @@
             pointer-events: none;
             z-index: 999;
             max-width: 300px;
-        }
-        .light-theme .voice-status {
-            background: rgba(255, 255, 255, 0.9);
-            color: black;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border);
         }
     </style>
 
@@ -222,15 +219,15 @@
 // --- Theme Toggle Logic ---
 const btn = document.getElementById('themeToggle');
 
-function applyTheme(isLight) {
-    if (isLight) {
-        document.body.classList.add('light-theme');
+function applyTheme(isDark) {
+    if (isDark) {
+        document.body.classList.add('dark-theme');
         btn.innerHTML = '<span class="icon">☀️</span> <span class="label">Light Mode</span>';
-        localStorage.setItem('theme', 'light');
-    } else {
-        document.body.classList.remove('light-theme');
-        btn.innerHTML = '<span class="icon">🌙</span> <span class="label">Dark Mode</span>';
         localStorage.setItem('theme', 'dark');
+    } else {
+        document.body.classList.remove('dark-theme');
+        btn.innerHTML = '<span class="icon">🌙</span> <span class="label">Dark Mode</span>';
+        localStorage.setItem('theme', 'light');
     }
     window.dispatchEvent(new Event('themeChanged'));
 }
@@ -246,11 +243,11 @@ if (!savedTheme) {
     }
 }
 
-applyTheme(savedTheme === 'light');
+applyTheme(savedTheme === 'dark');
 
 btn.addEventListener('click', () => {
-    const willBeLight = !document.body.classList.contains('light-theme');
-    applyTheme(willBeLight);
+    const willBeDark = !document.body.classList.contains('dark-theme');
+    applyTheme(willBeDark);
 });
 
 // --- Toast Notification System ---
