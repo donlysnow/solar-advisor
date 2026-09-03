@@ -48,8 +48,19 @@
     <!-- Main Content -->
     <div class="main-wrapper">
         <header class="topbar">
-            <div class="topbar-title">{% block header_title %}Dashboard{% endblock %}</div>
+            <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+                <div class="topbar-title">{% block header_title %}Dashboard{% endblock %}</div>
+                {% if current_user.is_authenticated and current_user.name %}
+                <div id="userGreeting" style="font-size: 14px; font-weight: 500; color: var(--text-secondary); padding-left: 12px; border-left: 1px solid var(--border);">
+                    <span class="dynamic-time-greeting">Hello</span>, <strong style="color: var(--text-primary);">{{ current_user.name.split()[0] }}</strong> 👋
+                </div>
+                {% endif %}
+            </div>
             <div class="topbar-actions">
+                <div id="topbarLocationBadge" style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-secondary); background: var(--bg-hover); padding: 6px 12px; border-radius: var(--radius); border: 1px solid var(--border); cursor: pointer;" title="Click to detect/refresh location" onclick="detectAndDisplayLocation(true)">
+                    <span>📍</span>
+                    <span id="topbarLocationText">Detecting location...</span>
+                </div>
                 <button id="aiToggleBtn" class="primary">
                     <span class="icon">✨</span> AI Copilot (Ctrl+K)
                 </button>
@@ -279,6 +290,103 @@ voiceBtn.addEventListener('click', () => {
         aiDrawer.classList.add('open');
         recognition.start();
     }
+});
+
+// --- Dynamic Time Greeting & Location ---
+function updateTimeGreetings() {
+    const hour = new Date().getHours();
+    let greeting = "Good evening";
+    if (hour >= 5 && hour < 12) {
+        greeting = "Good morning";
+    } else if (hour >= 12 && hour < 17) {
+        greeting = "Good afternoon";
+    }
+    
+    document.querySelectorAll('.dynamic-time-greeting').forEach(el => {
+        el.textContent = greeting;
+    });
+}
+updateTimeGreetings();
+
+async function reverseGeocode(lat, lon) {
+    try {
+        const url = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Reverse geocode failed");
+        const data = await res.json();
+        const city = data.city || data.locality || data.principalSubdivision || "";
+        const country = data.countryName || data.countryCode || "";
+        if (city && country) {
+            return `${city}, ${country}`;
+        } else if (city || country) {
+            return city || country;
+        }
+    } catch (err) {
+        console.warn("Reverse geocode fallback", err);
+    }
+    return `${lat.toFixed(2)}°, ${lon.toFixed(2)}°`;
+}
+
+async function detectAndDisplayLocation(userTriggered = false) {
+    const locBadge = document.getElementById('topbarLocationText');
+    if (!locBadge) return;
+
+    if (userTriggered) {
+        locBadge.textContent = "Detecting GPS...";
+    }
+
+    // Check cached location name first
+    const cachedCity = localStorage.getItem('solar_detected_city');
+    if (cachedCity && !userTriggered) {
+        locBadge.textContent = cachedCity;
+    }
+
+    if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+                const lat = pos.coords.latitude;
+                const lon = pos.coords.longitude;
+                const placeName = await reverseGeocode(lat, lon);
+                locBadge.textContent = placeName;
+                localStorage.setItem('solar_detected_city', placeName);
+                localStorage.setItem('solar_detected_lat', lat);
+                localStorage.setItem('solar_detected_lon', lon);
+                
+                const sub = document.getElementById('homeLocationSubtitle');
+                if (sub) sub.textContent = `📍 Forecast for ${placeName}`;
+
+                if (userTriggered) {
+                    showToast(`Location updated: ${placeName}`);
+                }
+            },
+            async (err) => {
+                // Fallback to settings or default
+                try {
+                    const r = await fetch('/api/live-settings');
+                    const s = await r.json();
+                    const lat = s.lat || 6.5244;
+                    const lon = s.lon || 3.3792;
+                    const placeName = await reverseGeocode(lat, lon);
+                    locBadge.textContent = placeName;
+                    const sub = document.getElementById('homeLocationSubtitle');
+                    if (sub) sub.textContent = `📍 Forecast for ${placeName}`;
+                } catch(e) {
+                    locBadge.textContent = "Lagos, Nigeria";
+                }
+                if (userTriggered) {
+                    showToast("Using default/saved location (GPS permission denied)", "error");
+                }
+            },
+            { timeout: 8000 }
+        );
+    } else {
+        locBadge.textContent = "Lagos, Nigeria";
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    updateTimeGreetings();
+    detectAndDisplayLocation(false);
 });
 </script>
 
