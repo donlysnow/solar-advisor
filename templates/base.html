@@ -3,10 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{% block title %}Smart Solar Energy Advisor{% endblock %}</title>
+<title>Solar Advisor Dashboard</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
 
@@ -18,199 +19,70 @@
     }
 </script>
 
-<nav class="sidebar">
-    <div class="brand"><span class="dot"></span> Solar Advisor</div>
-    <a class="nav-link {% if active == 'home' %}active{% endif %}" href="{{ url_for('home') }}">🏠 Home</a>
-    <a class="nav-link {% if active == 'live' %}active{% endif %}" href="{{ url_for('live_page') }}">⚡ Live Mode</a>
-    <a class="nav-link {% if active == 'advisor' %}active{% endif %}" href="{{ url_for('advisor_page') }}">🤖 AI Advisor</a>
-    <a class="nav-link {% if active == 'weather' %}active{% endif %}" href="{{ url_for('weather_page') }}">🌤️ Weather</a>
-    <a class="nav-link {% if active == 'appliances' %}active{% endif %}" href="{{ url_for('appliances_page') }}">🔌 Appliances</a>
-    <a class="nav-link {% if active == 'historical' %}active{% endif %}" href="{{ url_for('historical_page') }}">📊 Historical</a>
-    <a class="nav-link {% if active == 'about' %}active{% endif %}" href="{{ url_for('about_page') }}">❓ How It Works</a>
-    
-    <div style="flex-grow: 1;"></div>
-    
-    {% if current_user.is_authenticated %}
-        <a class="nav-link {% if active == 'profile' %}active{% endif %}" href="{{ url_for('profile') }}">👤 My Profile</a>
-        <a class="nav-link" href="{{ url_for('logout') }}" style="color: #ef4444;">🚪 Logout</a>
-    {% else %}
-        <a class="nav-link {% if active == 'login' %}active{% endif %}" href="{{ url_for('login') }}">🔐 Login</a>
-    {% endif %}
+<div class="app-container">
+    <!-- Sidebar -->
+    <nav class="sidebar">
+        <div class="brand"><span class="dot"></span> Solar Advisor</div>
+        <a class="nav-link {% if active == 'home' %}active{% endif %}" href="{{ url_for('home') }}">🏠 Overview</a>
+        <a class="nav-link {% if active == 'live' %}active{% endif %}" href="{{ url_for('live_page') }}">⚡ Live Engine</a>
+        <a class="nav-link {% if active == 'weather' %}active{% endif %}" href="{{ url_for('weather_page') }}">🌤️ Forecast</a>
+        <a class="nav-link {% if active == 'appliances' %}active{% endif %}" href="{{ url_for('appliances_page') }}">🔌 Appliances</a>
+        <a class="nav-link {% if active == 'historical' %}active{% endif %}" href="{{ url_for('historical_page') }}">📊 Analytics</a>
+        
+        <div class="sidebar-spacer"></div>
+        
+        {% if current_user.is_authenticated %}
+            <a class="nav-link {% if active == 'profile' %}active{% endif %}" href="{{ url_for('profile') }}">👤 Profile</a>
+            <a class="nav-link" href="{{ url_for('logout') }}" style="color: var(--danger);">🚪 Logout</a>
+        {% else %}
+            <a class="nav-link {% if active == 'login' %}active{% endif %}" href="{{ url_for('login') }}">🔐 Login</a>
+        {% endif %}
 
-    <button id="themeToggle" style="margin-bottom: 20px; background: transparent; border: 1px solid var(--border); box-shadow: none; color: var(--text-dim); justify-content: flex-start; gap: 12px; width: 100%;">
-        <span class="icon">🌙</span> <span class="label">Dark Mode</span>
-    </button>
+        <button id="themeToggle" class="ghost mt-4" style="justify-content: flex-start; padding: 10px 12px; width: 100%;">
+            <span class="icon">🌙</span> <span class="label">Dark Mode</span>
+        </button>
 
-    <div class="sidebar-footer">Smart Solar Energy Advisor</div>
-</nav>
+        <div class="sidebar-footer">v2.0 Enterprise</div>
+    </nav>
 
-    <div class="main">
-        {% block content %}{% endblock %}
+    <!-- Main Content -->
+    <div class="main-wrapper">
+        <header class="topbar">
+            <div class="topbar-title">{% block header_title %}Dashboard{% endblock %}</div>
+            <div class="topbar-actions">
+                <button id="aiToggleBtn" class="primary">
+                    <span class="icon">✨</span> AI Copilot (Ctrl+K)
+                </button>
+            </div>
+        </header>
+        
+        <main class="main-scroll">
+            <div class="content-max">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
     </div>
 
-    <!-- Voice AI Floating Action Button -->
-    <button id="voiceBtn" class="voice-fab" aria-label="Talk to Solar Advisor">
-        🎙️
-    </button>
-    <div id="voiceStatus" class="voice-status"></div>
-
-    <style>
-        .voice-fab {
-            position: fixed;
-            bottom: 30px;
-            right: 30px;
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            background: var(--accent-blue);
-            color: white;
-            font-size: 24px;
-            border: none;
-            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
-            cursor: pointer;
-            z-index: 1000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        .voice-fab:hover {
-            transform: scale(1.1);
-            box-shadow: 0 6px 25px rgba(59, 130, 246, 0.6);
-        }
-        .voice-fab.listening {
-            animation: pulse 1.5s infinite;
-            background: #ef4444;
-            box-shadow: 0 4px 20px rgba(239, 68, 68, 0.4);
-        }
-        @keyframes pulse {
-            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-            70% { transform: scale(1.1); box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
-            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-        }
-        .voice-status {
-            position: fixed;
-            bottom: 100px;
-            right: 30px;
-            background: var(--bg-elevated);
-            color: var(--text);
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-size: 14px;
-            opacity: 0;
-            transition: opacity 0.3s;
-            pointer-events: none;
-            z-index: 999;
-            max-width: 300px;
-            box-shadow: var(--shadow-lg);
-            border: 1px solid var(--border);
-        }
-    </style>
-
-    <script>
-        const voiceBtn = document.getElementById('voiceBtn');
-        const voiceStatus = document.getElementById('voiceStatus');
-        
-        let recognition = null;
-        let silenceTimer = null;
-
-        function resetSilenceTimer() {
-            if (silenceTimer) clearTimeout(silenceTimer);
-            silenceTimer = setTimeout(() => {
-                if (recognition) {
-                    showStatus("Turning off (8s silence)...");
-                    recognition.stop();
-                }
-            }, 8000);
-        }
-
-        if ('webkitSpeechRecognition' in window) {
-            recognition = new webkitSpeechRecognition();
-            recognition.continuous = true;
-            recognition.interimResults = false;
-            
-            recognition.onstart = function() {
-                voiceBtn.classList.add('listening');
-                showStatus("Listening...");
-                resetSilenceTimer();
-            };
-            
-            recognition.onresult = async function(event) {
-                resetSilenceTimer();
-                // Get the last result since it's continuous
-                const last = event.results.length - 1;
-                const transcript = event.results[last][0].transcript;
-                showStatus(`You: "${transcript}"`);
-                
-                try {
-                    const res = await fetch('/api/voice-command', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ transcription: transcript })
-                    });
-                    const data = await res.json();
-                    
-                    if (data.message) {
-                        showStatus(`AI: ${data.message}`);
-                        speakText(data.message);
-                        
-                        // If they added an appliance, refresh live page
-                        if (data.action === "ADD_APPLIANCE" && window.location.pathname === '/live') {
-                            setTimeout(() => window.location.reload(), 2000);
-                        }
-                    } else if (data.error) {
-                        showStatus(`Error: ${data.error}`);
-                    }
-                } catch (e) {
-                    showStatus("Failed to reach AI.");
-                }
-            };
-            
-            recognition.onerror = function(event) {
-                // Only stop listening if there's a serious error
-                if (event.error !== 'no-speech') {
-                    voiceBtn.classList.remove('listening');
-                    showStatus("Microphone error. Try again.");
-                    if (silenceTimer) clearTimeout(silenceTimer);
-                }
-            };
-            
-            recognition.onend = function() {
-                // If it ends naturally or from error, remove listening class
-                voiceBtn.classList.remove('listening');
-                if (silenceTimer) clearTimeout(silenceTimer);
-            };
-        } else {
-            voiceBtn.style.display = 'none'; // Hide if unsupported
-        }
-
-        voiceBtn.addEventListener('click', () => {
-            if (recognition) {
-                if (voiceBtn.classList.contains('listening')) {
-                    recognition.stop();
-                } else {
-                    recognition.start();
-                }
-            }
-        });
-
-        function showStatus(text) {
-            voiceStatus.textContent = text;
-            voiceStatus.style.opacity = 1;
-            setTimeout(() => {
-                if (voiceStatus.textContent === text) {
-                    voiceStatus.style.opacity = 0;
-                }
-            }, 5000);
-        }
-
-        function speakText(text) {
-            if ('speechSynthesis' in window) {
-                const utterance = new SpeechSynthesisUtterance(text);
-                window.speechSynthesis.speak(utterance);
-            }
-        }
-    </script>
+    <!-- AI Copilot Drawer -->
+    <aside id="aiDrawer" class="ai-drawer">
+        <div class="drawer-header">
+            <span>✨ AI Copilot</span>
+            <button id="closeAiBtn" class="ghost" style="padding: 4px;">✕</button>
+        </div>
+        <div id="chatHistory" class="drawer-body">
+            <div class="chat-msg ai">
+                <div class="chat-bubble">Hello! I'm your Solar AI Copilot. Ask me to analyze your live data, suggest schedules, or add an appliance.</div>
+            </div>
+        </div>
+        <div class="drawer-footer">
+            <div class="chat-input-wrapper">
+                <textarea id="aiInput" class="chat-input" placeholder="Ask AI anything..." rows="1"></textarea>
+                <button id="aiSendBtn" class="primary" style="height: 40px;">Send</button>
+                <button id="voiceBtn" class="ghost" style="height: 40px; padding: 0 10px;" title="Voice Input">🎙️</button>
+            </div>
+        </div>
+    </aside>
+</div>
 
 <!-- Toast Notifications -->
 <div id="toast-container"></div>
@@ -234,20 +106,13 @@ function applyTheme(isDark) {
 
 let savedTheme = localStorage.getItem('theme');
 if (!savedTheme) {
-    // Auto day/night based on time (6 AM to 6 PM is light mode)
     const hour = new Date().getHours();
-    if (hour >= 6 && hour < 18) {
-        savedTheme = 'light';
-    } else {
-        savedTheme = 'dark';
-    }
+    savedTheme = (hour >= 6 && hour < 18) ? 'light' : 'dark';
 }
-
 applyTheme(savedTheme === 'dark');
 
 btn.addEventListener('click', () => {
-    const willBeDark = !document.body.classList.contains('dark-theme');
-    applyTheme(willBeDark);
+    applyTheme(!document.body.classList.contains('dark-theme'));
 });
 
 // --- Toast Notification System ---
@@ -255,22 +120,166 @@ window.showToast = function(message, type = 'success') {
     const container = document.getElementById('toast-container');
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
-    
-    // Icon based on type
     const icon = type === 'success' ? '✅' : '❌';
     toast.innerHTML = `<span>${icon}</span> <div>${message}</div>`;
-    
     container.appendChild(toast);
-    
-    // Trigger animation
     setTimeout(() => toast.classList.add('show'), 10);
-    
-    // Remove after 3 seconds
     setTimeout(() => {
         toast.classList.remove('show');
         setTimeout(() => toast.remove(), 300);
     }, 3000);
 }
+
+// --- AI Copilot Logic ---
+const aiToggleBtn = document.getElementById('aiToggleBtn');
+const closeAiBtn = document.getElementById('closeAiBtn');
+const aiDrawer = document.getElementById('aiDrawer');
+const chatHistory = document.getElementById('chatHistory');
+const aiInput = document.getElementById('aiInput');
+const aiSendBtn = document.getElementById('aiSendBtn');
+const voiceBtn = document.getElementById('voiceBtn');
+
+// Keyboard shortcut (Ctrl+K or Cmd+K)
+document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        toggleDrawer();
+    }
+});
+
+function toggleDrawer() {
+    aiDrawer.classList.toggle('open');
+    if (aiDrawer.classList.contains('open')) {
+        setTimeout(() => aiInput.focus(), 300);
+    }
+}
+aiToggleBtn.addEventListener('click', toggleDrawer);
+closeAiBtn.addEventListener('click', () => aiDrawer.classList.remove('open'));
+
+// Auto-resize textarea
+aiInput.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = (this.scrollHeight) + 'px';
+});
+
+aiInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendChatMessage();
+    }
+});
+aiSendBtn.addEventListener('click', sendChatMessage);
+
+async function sendChatMessage() {
+    const text = aiInput.value.trim();
+    if (!text) return;
+    
+    // Add user message
+    appendMessage(text, 'user');
+    aiInput.value = '';
+    aiInput.style.height = 'auto';
+    
+    // Add typing indicator
+    const typingId = 'typing-' + Date.now();
+    appendTypingIndicator(typingId);
+    
+    // Determine context (which page we are on)
+    const contextStr = "Context: User is currently viewing " + window.location.pathname;
+
+    try {
+        // We will hit a new /api/copilot endpoint that supports chat history and markdown
+        // For now, we'll route to voice-command since it parses JSON, but we'll build a better backend next!
+        const res = await fetch('/api/copilot', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: text, context: contextStr })
+        });
+        const data = await res.json();
+        
+        removeTypingIndicator(typingId);
+        
+        if (data.message) {
+            appendMessage(data.message, 'ai', true);
+            if (data.action === "ADD_APPLIANCE" || data.action === "RELOAD") {
+                setTimeout(() => window.location.reload(), 2000);
+            }
+        } else if (data.error) {
+            appendMessage(`Error: ${data.error}`, 'ai', true);
+        }
+    } catch (e) {
+        removeTypingIndicator(typingId);
+        appendMessage("Failed to connect to the AI engine.", 'ai', false);
+    }
+}
+
+function appendMessage(text, sender, parseMarkdown = false) {
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `chat-msg ${sender}`;
+    
+    const bubble = document.createElement('div');
+    bubble.className = 'chat-bubble';
+    
+    if (parseMarkdown && sender === 'ai') {
+        bubble.innerHTML = marked.parse(text);
+    } else {
+        bubble.textContent = text;
+    }
+    
+    msgDiv.appendChild(bubble);
+    chatHistory.appendChild(msgDiv);
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+}
+
+function appendTypingIndicator(id) {
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `chat-msg ai`;
+    msgDiv.id = id;
+    msgDiv.innerHTML = `
+        <div class="chat-bubble typing-indicator">
+            <div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>
+        </div>
+    `;
+    chatHistory.appendChild(msgDiv);
+    chatHistory.scrollTop = chatHistory.scrollHeight;
+}
+
+function removeTypingIndicator(id) {
+    const el = document.getElementById(id);
+    if (el) el.remove();
+}
+
+// Voice Recognition
+let recognition = null;
+if ('webkitSpeechRecognition' in window) {
+    recognition = new webkitSpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    
+    recognition.onstart = function() {
+        voiceBtn.style.color = 'var(--danger)';
+    };
+    recognition.onresult = function(event) {
+        const transcript = event.results[0][0].transcript;
+        aiInput.value = transcript;
+        sendChatMessage();
+    };
+    recognition.onend = function() {
+        voiceBtn.style.color = '';
+    };
+    recognition.onerror = function() {
+        voiceBtn.style.color = '';
+        showToast('Microphone error', 'error');
+    };
+} else {
+    voiceBtn.style.display = 'none';
+}
+
+voiceBtn.addEventListener('click', () => {
+    if (recognition) {
+        aiDrawer.classList.add('open');
+        recognition.start();
+    }
+});
 </script>
 
 </body>

@@ -132,28 +132,27 @@ def get_ai_advice(days_out, appliances, weather_daily_summary, background_load_k
         return fallback, "offline"
 
 
-def process_voice_command(transcription, groq_api_key=None):
-    """
-    Uses Groq to parse a voice transcription and return a JSON intent.
-    """
+def process_copilot_chat(messages, context_str, groq_api_key=None):
     import json
     api_key = groq_api_key or config.GROQ_API_KEY
     if not api_key:
-        return {"error": "Groq API key required for voice parsing."}
+        return {"error": "Groq API key required for Copilot."}
 
     system_prompt = (
-        "You are a voice assistant for a solar energy app. The user just spoke a command. "
-        "Extract their intent into JSON format. "
-        "Possible intents:\n"
-        "1. ADD_APPLIANCE: if they want to add an appliance. Extract name, duration_minutes (default 60), and typical_power_kW (default 1.0).\n"
-        "2. FORECAST: if they want to know the forecast or best time to run something.\n"
-        "Respond ONLY with a valid JSON object matching this schema:\n"
-        "{\n"
-        "  \"action\": \"ADD_APPLIANCE\" | \"FORECAST\" | \"UNKNOWN\",\n"
-        "  \"appliance\": {\"name\": string, \"duration_minutes\": int, \"typical_power_kW\": float}, // only if ADD_APPLIANCE\n"
-        "  \"message\": \"A friendly, concise spoken response to the user.\"\n"
-        "}"
+        "You are an expert Solar Energy AI Copilot embedded inside a professional SaaS dashboard. "
+        "You help users analyze their data, configure their home battery, and schedule appliances. "
+        "Format your responses using Markdown. You can output tables, bold text, and lists. "
+        "If the user asks to add an appliance, return a valid JSON object wrapped in ```json block with an action. "
+        "JSON SCHEMA: {\"action\": \"ADD_APPLIANCE\", \"appliance\": {\"name\": str, \"duration_minutes\": int, \"typical_power_kW\": float}}\n"
+        "Otherwise, just respond normally in Markdown.\n\n"
+        f"{context_str}"
     )
+
+    formatted_messages = [{"role": "system", "content": system_prompt}]
+    
+    # Keep only the last 10 messages to save context limit
+    for msg in messages[-10:]:
+        formatted_messages.append({"role": msg["role"], "content": msg["content"]})
 
     try:
         resp = requests.post(
@@ -161,17 +160,27 @@ def process_voice_command(transcription, groq_api_key=None):
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json={
                 "model": config.GROQ_MODEL,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": transcription},
-                ],
-                "temperature": 0.1,
-                "response_format": {"type": "json_object"}
+                "messages": formatted_messages,
+                "temperature": 0.4,
+                "max_tokens": 800,
             },
-            timeout=10,
+            timeout=15,
         )
         resp.raise_for_status()
         content = resp.json()["choices"][0]["message"]["content"]
-        return json.loads(content)
+        
+        # Check if the AI outputted a JSON action block
+        action = None
+        if "```json" in content:
+            try:
+                json_str = content.split("```json")[1].split("```")[0].strip()
+                data = json.loads(json_str)
+                action = data.get("action")
+                if action == "ADD_APPLIANCE":
+                    return {"message": content.replace(f"```json\n{json_str}\n```", ""), "action": action, "appliance": data.get("appliance")}
+            except:
+                pass
+                
+        return {"message": content, "action": action}
     except Exception as e:
-        return {"error": str(e), "message": "Sorry, I had trouble understanding that."}
+        return {"error": str(e), "message": "Connection to AI Engine failed."}

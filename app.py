@@ -552,14 +552,24 @@ def advisor_tips():
     return jsonify({"result": result, "source": source, "days": days_out, "weather_daily": weather_daily})
 
 
-@app.route("/api/voice-command", methods=["POST"])
-def voice_command():
+@app.route("/api/copilot", methods=["POST"])
+def copilot():
     body = request.get_json(silent=True) or {}
-    transcription = body.get("transcription")
-    if not transcription:
-        return jsonify({"error": "No transcription provided."}), 400
+    message = body.get("message")
+    context_str = body.get("context", "")
     
-    result = advisor.process_voice_command(transcription)
+    if not message:
+        return jsonify({"error": "No message provided."}), 400
+        
+    chat_history = session.get("copilot_history", [])
+    chat_history.append({"role": "user", "content": message})
+    
+    result = advisor.process_copilot_chat(chat_history, context_str)
+    
+    if "message" in result:
+        chat_history.append({"role": "assistant", "content": result["message"]})
+        # Keep last 20 messages in session
+        session["copilot_history"] = chat_history[-20:]
     
     if result.get("action") == "ADD_APPLIANCE" and "appliance" in result:
         appliances = get_session_appliances()

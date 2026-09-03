@@ -1,635 +1,365 @@
 {% extends "base.html" %}
-{% block title %}Live Mode{% endblock %}
+{% block header_title %}Live Engine{% endblock %}
+
 {% block content %}
-
-<h1>Live Mode</h1>
-<p class="lead">Uses real weather for your location. Shows today plus a 2-day outlook. Today's run is saved to your Live Log.</p>
-
-<div class="panel" id="locationStatus" style="margin-bottom:16px;">
-    <button class="secondary" onclick="detectLocation()">📍 Use my current location</button>
-    <span id="locationStatusText" style="font-size:13px; color:var(--text-dim); margin-left:10px;"></span>
+<div class="tabs">
+    <div class="tab active" data-target="tab-overview">Overview</div>
+    <div class="tab" data-target="tab-configuration">Configuration</div>
+    <div class="tab" data-target="tab-financials">Financials</div>
 </div>
 
-<div class="controls">
-    <div class="field-group" style="max-width:160px;">
-        <input id="latInput" type="text" value="6.5244">
-        <span>Latitude</span>
+<!-- Tab: Overview -->
+<div id="tab-overview" class="tab-content active">
+    <div class="flex-between mb-4">
+        <div>
+            <h2 style="margin-bottom:4px;">Today's Live Forecast</h2>
+            <div style="color:var(--text-secondary); font-size:13px;" id="locationLabel">📍 Using Location: Loading...</div>
+        </div>
+        <button class="primary" onclick="loadLiveRecommendations()">
+            <span class="icon">⚡</span> Run Engine
+        </button>
     </div>
-    <div class="field-group" style="max-width:160px;">
-        <input id="lonInput" type="text" value="3.3792">
-        <span>Longitude</span>
-    </div>
-    <div class="field-group" style="max-width:140px;">
-        <input id="pvInput" type="text" value="4.0">
-        <span>Solar panel size (kW)</span>
-    </div>
-    <div class="field-group" style="max-width:220px;">
-        <input id="backgroundLoadInput" type="text" value="0.3">
-        <span>Your typical background load (kW)</span>
-    </div>
-</div>
 
-<div class="panel" style="margin-bottom:16px;">
-    <b style="font-size:13px;">Don't know your panel's total kW?</b>
-    <div class="controls" style="margin-top:10px; margin-bottom:0;">
-        <div class="field-group" style="max-width:140px;">
-            <input id="panelCountInput" type="number" placeholder="e.g. 10">
-            <span>Number of panels</span>
+    <!-- KPI Grid -->
+    <div class="data-grid mb-4">
+        <div class="kpi-card">
+            <div class="kpi-label">Solar Quality</div>
+            <div class="kpi-value" id="kpi-quality">--</div>
+            <div style="font-size:12px; color:var(--text-secondary); margin-top:4px;">Daily Irradiance Forecast</div>
         </div>
-        <div class="field-group" style="max-width:140px;">
-            <input id="panelWattInput" type="number" placeholder="e.g. 400">
-            <span>Watts per panel</span>
+        <div class="kpi-card">
+            <div class="kpi-label">Total Generation</div>
+            <div class="kpi-value" id="kpi-generation">-- <span style="font-size:14px;font-weight:500;">kWh</span></div>
+            <div style="font-size:12px; color:var(--text-secondary); margin-top:4px;">Predicted PV Output</div>
         </div>
-
-
-        <button class="btn" style="width:100%; justify-content:center; margin-top:20px;" onclick="saveSettings()">Save & Recalculate</button>
-        <button class="secondary" onclick="calcPanelKw()">Calculate and fill in</button>
-    </div>
-</div>
-
-<div class="panel" style="margin-bottom:16px;">
-    <!-- Financial Settings -->
-    <div class="controls" style="margin-bottom:12px;">
-        <div class="field-group" style="max-width:200px;">
-            <input id="electricityRate" type="text" value="225.0">
-            <span>Electricity Tariff (Price/kWh)</span>
+        <div class="kpi-card">
+            <div class="kpi-label">Grid Reliance</div>
+            <div class="kpi-value" id="kpi-grid">-- <span style="font-size:14px;font-weight:500;">kWh</span></div>
+            <div style="font-size:12px; color:var(--text-secondary); margin-top:4px;">Estimated Import</div>
+        </div>
+        <div class="kpi-card">
+            <div class="kpi-label">Cost Savings</div>
+            <div class="kpi-value" style="color:var(--success);" id="kpi-savings">--</div>
+            <div style="font-size:12px; color:var(--text-secondary); margin-top:4px;">From Solar + Battery</div>
         </div>
     </div>
-    <label style="font-size:13px; display:flex; align-items:center; gap:8px;">
-        <input type="checkbox" id="advancedToggle" onchange="toggleAdvanced()" style="width:auto;">
-        Show advanced settings (system losses, battery)
-    </label>
-    <div id="advancedSettings" style="display:none; margin-top:16px;">
-        <div class="controls" style="margin-bottom:12px;">
-            <div class="field-group" style="max-width:160px;">
-                <input id="systemLossInput" type="text" value="0">
-                <span>System losses (%) -- inverter/wiring heat loss</span>
-            </div>
+
+    <!-- Main Chart -->
+    <div class="panel">
+        <div class="panel-header">
+            <h3>Power Flow Forecast (kW)</h3>
         </div>
-        <label style="font-size:13px; display:flex; align-items:center; gap:8px; margin-bottom:12px;">
-            <input type="checkbox" id="batteryToggle" onchange="toggleBatteryFields()" style="width:auto;">
-            I have a battery
-        </label>
-        <div id="batteryFields" style="display:none;" class="controls">
-            <div class="field-group" style="max-width:150px;">
-                <input id="batteryCapacityInput" type="text" value="5.0">
-                <span>Battery capacity (kWh)</span>
-            </div>
-            <div class="field-group" style="max-width:150px;">
-                <input id="batteryChargeRateInput" type="text" value="2.0">
-                <span>Max charge rate (kW)</span>
-            </div>
-            <div class="field-group" style="max-width:150px;">
-                <input id="batteryDischargeRateInput" type="text" value="2.0">
-                <span>Max discharge rate (kW)</span>
-            </div>
-            <div class="field-group" style="max-width:150px;">
-                <input id="batterySocInput" type="text" value="50">
-                <span>Current charge (%)</span>
-            </div>
+        <div class="chart-container">
+            <canvas id="mainChart"></canvas>
         </div>
-        <p style="font-size:11px; color:var(--text-dim); margin-top:8px;">
-            Battery model: charges from sunlight without taking anything away from your appliances during the day,
-            then discharges to help cover appliances when there's little or no sun. It does not perfectly optimize
-            charging vs. appliance use at the same time -- a simplification, not a live reading.
-        </p>
+    </div>
+
+    <!-- Recommendations Table -->
+    <div class="panel">
+        <div class="panel-header">
+            <h3>Appliance Schedule</h3>
+        </div>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Appliance</th>
+                    <th>Optimal Window</th>
+                    <th>Solar Coverage</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="applianceTableBody">
+                <tr><td colspan="4" style="text-align:center; color:var(--text-tertiary);">Run the engine to generate schedule</td></tr>
+            </tbody>
+        </table>
     </div>
 </div>
 
-<button class="blue" onclick="loadLiveRecommendations()">Get Live Forecast</button>
-
-<h2>Using appliances</h2>
-<div id="applianceSummary" style="margin: 12px 0 20px;"></div>
-
-<div id="dayTabs" class="controls" style="display:none;"></div>
-
-<div id="summaryBanner"></div>
-
-<div id="loading" style="display:none;">Fetching live weather and forecasting...</div>
-<div id="emptyState" style="display:none;" class="panel">
-    You have no active appliances, so there's nothing to schedule yet.
-    <a href="/appliances" style="color:var(--accent-blue);">Add or turn on appliances</a> to get a personalized plan.
-</div>
-
-<!-- Interactive Sky Timeline -->
-<div id="skyTimelineContainer" class="panel" style="display:none; padding:0; overflow:hidden; margin-bottom:20px; border-radius:16px;">
-    <div id="skyBackground" style="padding:40px 20px; transition: background 0.5s; text-align:center;">
-        <h2 id="skyTimeDisplay" style="color:white; font-size:48px; margin:0 0 10px; text-shadow:0 2px 10px rgba(0,0,0,0.5);">12:00</h2>
-        <div id="skySun" style="font-size:40px; text-shadow:0 0 30px rgba(255, 255, 255, 0.8); transition: transform 0.5s;">☀️</div>
+<!-- Tab: Configuration -->
+<div id="tab-configuration" class="tab-content">
+    <div class="panel">
+        <div class="panel-header">
+            <h3>System Parameters</h3>
+            <button class="ghost" onclick="detectLocation()">📍 Detect Location</button>
+        </div>
+        <div class="data-grid">
+            <div>
+                <label class="kpi-label" style="display:block;">Latitude</label>
+                <input id="latInput" type="text" value="6.5244">
+            </div>
+            <div>
+                <label class="kpi-label" style="display:block;">Longitude</label>
+                <input id="lonInput" type="text" value="3.3792">
+            </div>
+            <div>
+                <label class="kpi-label" style="display:block;">Solar Panel Size (kW)</label>
+                <input id="pvInput" type="text" value="4.0">
+            </div>
+            <div>
+                <label class="kpi-label" style="display:block;">Background Load (kW)</label>
+                <input id="backgroundLoadInput" type="text" value="0.3">
+            </div>
+        </div>
         
-        <div id="skyAppliances" style="margin-top:30px; display:flex; justify-content:center; gap:20px; flex-wrap:wrap; min-height:80px;">
-            <!-- Active appliances will appear here and glow -->
+        <div style="margin-top:24px; padding-top:24px; border-top:1px solid var(--border);">
+            <h4 style="margin-bottom:16px;">Advanced (Battery Integration)</h4>
+            <label style="display:flex; align-items:center; gap:8px; margin-bottom:16px; font-weight:500;">
+                <input type="checkbox" id="batteryToggle" onchange="toggleBatteryFields()"> Enable Battery Simulation
+            </label>
+            <div id="batteryFields" class="data-grid" style="display:none; opacity:0.6;">
+                <div>
+                    <label class="kpi-label" style="display:block;">Capacity (kWh)</label>
+                    <input id="batteryCapacityInput" type="text" value="5.0">
+                </div>
+                <div>
+                    <label class="kpi-label" style="display:block;">Max Charge Rate (kW)</label>
+                    <input id="batteryChargeRateInput" type="text" value="2.0">
+                </div>
+                <div>
+                    <label class="kpi-label" style="display:block;">Max Discharge Rate (kW)</label>
+                    <input id="batteryDischargeRateInput" type="text" value="2.0">
+                </div>
+                <div>
+                    <label class="kpi-label" style="display:block;">Current Charge (%)</label>
+                    <input id="batterySocInput" type="text" value="50">
+                </div>
+            </div>
+        </div>
+        
+        <div class="flex-between" style="margin-top:32px; padding-top:24px; border-top:1px solid var(--border);">
+            <button class="primary" onclick="saveSettings()">Save Configuration</button>
         </div>
     </div>
-    <div style="padding:20px; background:var(--panel-bg);">
-        <input type="range" id="timeSlider" min="0" max="95" value="48" style="width:100%;" oninput="updateTimeline()">
-        <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-dim); margin-top:10px;">
-            <span>00:00</span>
-            <span>12:00</span>
-            <span>23:45</span>
+</div>
+
+<!-- Tab: Financials -->
+<div id="tab-financials" class="tab-content">
+    <div class="panel">
+        <div class="panel-header">
+            <h3>Electricity Tariff Settings</h3>
+        </div>
+        <div style="max-width:300px;">
+            <label class="kpi-label" style="display:block;">Price per kWh</label>
+            <input id="electricityRate" type="text" value="225.0">
+            <div style="font-size:12px; color:var(--text-secondary); margin-top:8px;">Used to calculate your daily savings.</div>
+            <button class="primary mt-4" onclick="saveSettings()">Update Rate</button>
         </div>
     </div>
 </div>
-
-<div class="cards" id="cards"></div>
-
-<h2>Load, PV & surplus curve</h2>
-<div id="chartContainer" style="margin-bottom:24px;">
-    <canvas id="energyChart" height="90"></canvas>
-</div>
-
-<h2>Hourly solar generation</h2>
-<div class="panel" style="margin-bottom:12px;">
-    <span style="font-size:13px; color:var(--text-dim);">Total expected today</span>
-    <div id="totalGenLabel" style="font-size:28px; font-weight:800; margin-top:4px;">-- kWh</div>
-</div>
-<div id="hourlyChartContainer" style="margin-bottom:16px;">
-    <canvas id="hourlyChart" height="80"></canvas>
-</div>
-
-<button class="secondary" id="exportBtn" style="display:none;" onclick="exportPlan()">Download this plan as text</button>
 
 <script>
-let chart = null;
-let hourlyChart = null;
-let multiDayData = null;
-let activeDayIndex = 0;
-
-function calcPanelKw() {
-    const count = parseFloat(document.getElementById("panelCountInput").value);
-    const watts = parseFloat(document.getElementById("panelWattInput").value);
-    if (count > 0 && watts > 0) {
-        const kw = (count * watts) / 1000;
-        document.getElementById("pvInput").value = kw.toFixed(2);
-    }
-}
-
-function toggleAdvanced() {
-    document.getElementById("advancedSettings").style.display =
-        document.getElementById("advancedToggle").checked ? "block" : "none";
-}
+// --- Tab Switching Logic ---
+document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(tab.dataset.target).classList.add('active');
+    });
+});
 
 function toggleBatteryFields() {
-    document.getElementById("batteryFields").style.display =
-        document.getElementById("batteryToggle").checked ? "flex" : "none";
-}
-
-async function loadSavedSettings() {
-    const res = await fetch("/api/live-settings");
-    const data = await res.json();
-    if (data.lat) document.getElementById("latInput").value = data.lat;
-    if (data.lon) document.getElementById("lonInput").value = data.lon;
-    if (data.pv_capacity) document.getElementById("pvInput").value = data.pv_capacity;
-    if (data.electricity_rate) document.getElementById("electricityRate").value = data.electricity_rate;
-    if (data.background_load_kW !== undefined) document.getElementById("backgroundLoadInput").value = data.background_load_kW;
-    if (data.system_loss_pct !== undefined) document.getElementById("systemLossInput").value = data.system_loss_pct;
-    if (data.battery_enabled) {
-        document.getElementById("advancedToggle").checked = true;
-        document.getElementById("batteryToggle").checked = true;
-        toggleAdvanced();
-        toggleBatteryFields();
-        if (data.battery_capacity_kWh) document.getElementById("batteryCapacityInput").value = data.battery_capacity_kWh;
-        if (data.battery_charge_rate_kW) document.getElementById("batteryChargeRateInput").value = data.battery_charge_rate_kW;
-        if (data.battery_discharge_rate_kW) document.getElementById("batteryDischargeRateInput").value = data.battery_discharge_rate_kW;
-        if (data.battery_initial_soc_pct) document.getElementById("batterySocInput").value = data.battery_initial_soc_pct;
-    }
+    const el = document.getElementById('batteryFields');
+    el.style.display = document.getElementById('batteryToggle').checked ? 'grid' : 'none';
 }
 
 function detectLocation() {
-    const statusText = document.getElementById("locationStatusText");
-    if (!navigator.geolocation) {
-        statusText.textContent = "Your browser doesn't support location detection -- enter coordinates manually.";
-        return;
+    if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                document.getElementById('latInput').value = position.coords.latitude.toFixed(4);
+                document.getElementById('lonInput').value = position.coords.longitude.toFixed(4);
+                showToast("Location updated");
+            },
+            (error) => showToast("Error getting location", "error")
+        );
     }
-    statusText.textContent = "Detecting your location...";
-    navigator.geolocation.getCurrentPosition(
-        (position) => {
-            document.getElementById("latInput").value = position.coords.latitude.toFixed(4);
-            document.getElementById("lonInput").value = position.coords.longitude.toFixed(4);
-            statusText.textContent = "Location detected. You can still edit it manually below if needed.";
-        },
-        (error) => {
-            statusText.textContent = "Couldn't get your location (permission denied or unavailable) -- enter coordinates manually.";
+}
+
+async function loadSettings() {
+    try {
+        const r = await fetch("/api/live-settings");
+        const s = await r.json();
+        if(s.lat) document.getElementById("latInput").value = s.lat;
+        if(s.lon) document.getElementById("lonInput").value = s.lon;
+        if(s.pv_capacity) document.getElementById("pvInput").value = s.pv_capacity;
+        if(s.background_load_kW) document.getElementById("backgroundLoadInput").value = s.background_load_kW;
+        if(s.electricity_rate) document.getElementById("electricityRate").value = s.electricity_rate;
+        if(s.battery_enabled) {
+            document.getElementById("batteryToggle").checked = true;
+            toggleBatteryFields();
         }
-    );
-}
-
-async function loadApplianceSummary() {
-    const res = await fetch("/api/appliances");
-    const data = await res.json();
-    const activeAppliances = (data.appliances || []).filter(a => a.active !== false);
-    const container = document.getElementById("applianceSummary");
-    if (activeAppliances.length === 0) {
-        container.innerHTML = `No active appliances. <a href="/appliances" style="color:var(--accent-blue);">Add or turn some on</a>.`;
-        return;
+        if(s.battery_capacity_kWh) document.getElementById("batteryCapacityInput").value = s.battery_capacity_kWh;
+        if(s.battery_charge_rate_kW) document.getElementById("batteryChargeRateInput").value = s.battery_charge_rate_kW;
+        if(s.battery_discharge_rate_kW) document.getElementById("batteryDischargeRateInput").value = s.battery_discharge_rate_kW;
+        if(s.battery_initial_soc_pct) document.getElementById("batterySocInput").value = s.battery_initial_soc_pct;
+    } catch(e) {
+        console.error(e);
     }
-    container.innerHTML = activeAppliances.map(a =>
-        `<span class="pill">${a.name} <span class="power">${a.duration_minutes}min · ${a.typical_power_kW}kW</span></span>`
-    ).join("") + ` <a href="/appliances" style="font-size:13px; color:var(--text-dim);">Edit list</a>`;
+}
+window.addEventListener("load", loadSettings);
+
+async function saveSettings() {
+    const body = {
+        lat: parseFloat(document.getElementById("latInput").value) || 0,
+        lon: parseFloat(document.getElementById("lonInput").value) || 0,
+        pv_capacity: parseFloat(document.getElementById("pvInput").value) || 0,
+        background_load_kW: parseFloat(document.getElementById("backgroundLoadInput").value) || 0,
+        electricity_rate: parseFloat(document.getElementById("electricityRate").value) || 0,
+        battery_enabled: document.getElementById("batteryToggle").checked,
+        battery_capacity_kWh: parseFloat(document.getElementById("batteryCapacityInput").value) || 0,
+        battery_charge_rate_kW: parseFloat(document.getElementById("batteryChargeRateInput").value) || 0,
+        battery_discharge_rate_kW: parseFloat(document.getElementById("batteryDischargeRateInput").value) || 0,
+        battery_initial_soc_pct: parseFloat(document.getElementById("batterySocInput").value) || 0
+    };
+    try {
+        await fetch("/api/live-settings", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify(body)
+        });
+        showToast("Settings saved successfully");
+    } catch(e) {
+        showToast("Error saving settings", "error");
+    }
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-    loadApplianceSummary();
-    loadSavedSettings();
-});
+let mainChart = null;
 
 async function loadLiveRecommendations() {
-    document.getElementById("loading").style.display = "block";
-    document.getElementById("emptyState").style.display = "none";
-    document.getElementById("cards").innerHTML = "";
-    document.getElementById("dayTabs").style.display = "none";
-    document.getElementById("exportBtn").style.display = "none";
-
-    const lat = parseFloat(document.getElementById("latInput").value) || 6.5244;
-    const lon = parseFloat(document.getElementById("lonInput").value) || 3.3792;
-    const pvCapacity = parseFloat(document.getElementById("pvInput").value) || 4.0;
-    const backgroundLoad = parseFloat(document.getElementById("backgroundLoadInput").value) || 0.3;
-    const systemLossPct = parseFloat(document.getElementById("systemLossInput").value) || 0;
-    const electricityRate = parseFloat(document.getElementById("electricityRate").value) || 225.0;
-
-    let battery = null;
+    const body = {
+        lat: parseFloat(document.getElementById("latInput").value),
+        lon: parseFloat(document.getElementById("lonInput").value),
+        pv_capacity: parseFloat(document.getElementById("pvInput").value),
+        background_load_kW: parseFloat(document.getElementById("backgroundLoadInput").value),
+        electricity_rate: parseFloat(document.getElementById("electricityRate").value),
+    };
+    
     if (document.getElementById("batteryToggle").checked) {
-        battery = {
-            capacity_kWh: parseFloat(document.getElementById("batteryCapacityInput").value) || 5.0,
-            charge_rate_kW: parseFloat(document.getElementById("batteryChargeRateInput").value) || 2.0,
-            discharge_rate_kW: parseFloat(document.getElementById("batteryDischargeRateInput").value) || 2.0,
-            initial_soc_pct: parseFloat(document.getElementById("batterySocInput").value) || 50,
+        body.battery = {
+            capacity_kWh: parseFloat(document.getElementById("batteryCapacityInput").value),
+            charge_rate_kW: parseFloat(document.getElementById("batteryChargeRateInput").value),
+            discharge_rate_kW: parseFloat(document.getElementById("batteryDischargeRateInput").value),
+            initial_soc_pct: parseFloat(document.getElementById("batterySocInput").value)
         };
     }
-
-    const settingsPayload = {
-        lat, lon, pv_capacity: pvCapacity, background_load_kW: backgroundLoad,
-        system_loss_pct: systemLossPct, electricity_rate: electricityRate, battery_enabled: !!battery,
-        battery_capacity_kWh: battery?.capacity_kWh, battery_charge_rate_kW: battery?.charge_rate_kW,
-        battery_discharge_rate_kW: battery?.discharge_rate_kW, battery_initial_soc_pct: battery?.initial_soc_pct,
-    };
-    fetch("/api/live-settings", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settingsPayload),
-    });
-
-    const res = await fetch("/api/live-recommendations-multiday", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            lat, lon, pv_capacity: pvCapacity, background_load_kW: backgroundLoad,
-            system_loss_pct: systemLossPct, battery, days: 3,
-        }),
-    });
-    const data = await res.json();
-    document.getElementById("loading").style.display = "none";
-
-    if (data.error) {
-        document.getElementById("cards").innerHTML = `<div class="result-card">${data.error}</div>`;
-        return;
-    }
-
-    multiDayData = data.days;
-    activeDayIndex = 0;
-    renderDayTabs();
-    renderActiveDay();
-}
-
-function renderDayTabs() {
-    const tabsContainer = document.getElementById("dayTabs");
-    tabsContainer.style.display = "flex";
-    tabsContainer.innerHTML = multiDayData.map((d, i) =>
-        `<button class="${i === activeDayIndex ? '' : 'secondary'}" onclick="switchDay(${i})">${d.label} (${d.date})</button>`
-    ).join("");
-}
-
-function switchDay(index) {
-    activeDayIndex = index;
-    renderDayTabs();
-    renderActiveDay();
-}
-
-function renderActiveDay() {
-    const day = multiDayData[activeDayIndex];
-    const hasAppliances = Object.keys(day.recommendations).length > 0;
-
-    document.getElementById("emptyState").style.display = hasAppliances ? "none" : "block";
-    document.getElementById("exportBtn").style.display = hasAppliances ? "inline-block" : "none";
-    document.getElementById("skyTimelineContainer").style.display = hasAppliances ? "block" : "none";
-
-    renderSummary(day.summary, day.battery_enabled);
-    renderCards(day.recommendations);
-    renderChart(day.day_data, day.battery_enabled);
-    renderHourlyChart(day.day_data);
-    updateTimeline();
-}
-
-function updateTimeline() {
-    if (!multiDayData || !multiDayData[activeDayIndex]) return;
     
-    const slider = document.getElementById("timeSlider");
-    const index = parseInt(slider.value); // 0 to 95
+    document.getElementById("locationLabel").textContent = `📍 Using Location: ${body.lat.toFixed(2)}, ${body.lon.toFixed(2)}`;
     
-    const hour = Math.floor(index / 4);
-    const minute = (index % 4) * 15;
-    const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-    
-    document.getElementById("skyTimeDisplay").textContent = timeStr;
-    
-    // Background colors based on time
-    const sky = document.getElementById("skyBackground");
-    const sun = document.getElementById("skySun");
-    
-    if (hour < 6 || hour >= 19) {
-        // Night
-        sky.style.background = "linear-gradient(to bottom, #0f172a, #1e293b)";
-        sun.textContent = "🌙";
-        sun.style.transform = "translateY(20px)";
-    } else if (hour >= 6 && hour < 9) {
-        // Sunrise
-        sky.style.background = "linear-gradient(to bottom, #f59e0b, #fbbf24)";
-        sun.textContent = "🌅";
-        sun.style.transform = "translateY(10px)";
-    } else if (hour >= 9 && hour < 16) {
-        // Day
-        sky.style.background = "linear-gradient(to bottom, #3b82f6, #60a5fa)";
-        sun.textContent = "☀️";
-        sun.style.transform = "translateY(-10px)";
-    } else {
-        // Sunset
-        sky.style.background = "linear-gradient(to bottom, #f97316, #fb923c)";
-        sun.textContent = "🌇";
-        sun.style.transform = "translateY(10px)";
-    }
-    
-    // Active appliances
-    const day = multiDayData[activeDayIndex];
-    const recs = day.recommendations;
-    const container = document.getElementById("skyAppliances");
-    container.innerHTML = "";
-    
-    for (const [appliance, windowData] of Object.entries(recs)) {
-        if (!windowData) continue;
+    try {
+        const res = await fetch("/api/live-recommendations-multiday", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ ...body, days: 1 })
+        });
+        const data = await res.json();
         
-        const startIdx = timeToIdx(windowData.start_time);
-        const endIdx = timeToIdx(windowData.end_time);
+        if (data.error) {
+            showToast(data.error, "error");
+            return;
+        }
         
-        if (index >= startIdx && index < endIdx) {
-            // Appliance is running
-            const icon = getApplianceIcon(appliance);
-            const el = document.createElement("div");
-            el.innerHTML = `
-                <div style="font-size:30px; animation: glow 1s infinite alternate; filter: drop-shadow(0 0 10px rgba(255,255,255,0.8));">
-                    ${icon}
-                </div>
-                <div style="font-size:12px; color:white; font-weight:bold; margin-top:5px; text-shadow:0 1px 3px rgba(0,0,0,0.8);">${appliance.replace(/_/g, " ")}</div>
+        const today = data.days[0];
+        
+        // Update KPIs
+        document.getElementById("kpi-quality").textContent = (today.summary.solar_quality || "--").toUpperCase();
+        document.getElementById("kpi-generation").innerHTML = `${today.summary.total_pv_kWh.toFixed(1)} <span style="font-size:14px;font-weight:500;">kWh</span>`;
+        document.getElementById("kpi-grid").innerHTML = `${(today.summary.total_grid_import_kWh || 0).toFixed(1)} <span style="font-size:14px;font-weight:500;">kWh</span>`;
+        document.getElementById("kpi-savings").textContent = `₦${(today.summary.total_savings_currency || 0).toFixed(0)}`;
+        
+        // Update Table
+        const tbody = document.getElementById("applianceTableBody");
+        tbody.innerHTML = "";
+        
+        for (const [name, rec] of Object.entries(today.recommendations)) {
+            if (!rec) continue;
+            const start = new Date(rec.start_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            const end = new Date(rec.end_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            const status = rec.solar_covered ? '<span class="badge success">Covered</span>' : '<span class="badge warning">Grid Needed</span>';
+            
+            tbody.innerHTML += `
+                <tr>
+                    <td style="text-transform:capitalize; font-weight:500;">${name.replace(/_/g, " ")}</td>
+                    <td><span style="font-family:'JetBrains Mono', monospace;">${start} - ${end}</span></td>
+                    <td>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <div style="flex:1; height:6px; background:var(--bg-hover); border-radius:3px; overflow:hidden;">
+                                <div style="height:100%; width:${rec.coverage_pct}%; background:var(--accent);"></div>
+                            </div>
+                            <span style="font-size:12px; font-weight:500;">${rec.coverage_pct.toFixed(0)}%</span>
+                        </div>
+                    </td>
+                    <td>${status}</td>
+                </tr>
             `;
-            el.style.textAlign = "center";
-            container.appendChild(el);
         }
-    }
-    
-    if (container.innerHTML === "") {
-        container.innerHTML = `<div style="color:rgba(255,255,255,0.5); font-style:italic; line-height:80px;">No appliances scheduled right now</div>`;
-    }
-}
-
-function timeToIdx(timeStr) {
-    // timeStr could be "2026-08-13 14:30:00" or just "14:30"
-    const parts = timeStr.split(" ");
-    const t = parts.length > 1 ? parts[1] : parts[0];
-    const [h, m] = t.split(":");
-    return parseInt(h) * 4 + Math.floor(parseInt(m) / 15);
-}
-
-function getApplianceIcon(name) {
-    const map = {
-        'washing_machine': '🧺',
-        'dishwasher': '🍽️',
-        'ev_charging': '🚗',
-        'water_heater': '💧',
-        'pool_pump': '🏊'
-    };
-    return map[name] || '🔌';
-}
-
-function exportPlan() {
-    const day = multiDayData[activeDayIndex];
-    let text = `Smart Solar Energy Advisor -- Plan for ${day.label} (${day.date})\n`;
-    text += `${day.summary.headline}\n\n`;
-    text += `Solar generation: ${day.summary.total_pv_kWh_today} kWh\n`;
-    text += `Appliances fully solar-covered: ${day.summary.appliances_covered}/${day.summary.appliances_total}\n`;
-    text += `Estimated grid energy saved: ~${day.summary.estimated_kwh_saved} kWh\n`;
-    text += `Estimated NGN saved: ~${day.summary.estimated_cost_saved}\n\n`;
-    text += `Appliance schedule:\n`;
-    for (const [name, w] of Object.entries(day.recommendations)) {
-        if (!w) { text += `- ${name}: no window found\n`; continue; }
-        const start = w.start_time.split(" ")[1]?.slice(0, 5) || w.start_time;
-        const end = w.end_time.split(" ")[1]?.slice(0, 5) || w.end_time;
-        text += `- ${name}: ${start} - ${end} (${w.coverage_pct}% solar covered)\n`;
-    }
-
-    const blob = new Blob([text], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `solar-plan-${day.date}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-}
-
-function renderSummary(summary, batteryEnabled) {
-    const banner = document.getElementById("summaryBanner");
-    if (!summary) { banner.innerHTML = ""; return; }
-    banner.innerHTML = `
-        <div class="summary-banner quality-${summary.solar_quality}">
-            <div class="headline">${summary.headline}${batteryEnabled ? ' (battery included)' : ''}</div>
-            <div class="summary-stats">
-                <div class="summary-stat"><span class="value">${summary.total_pv_kWh_today} kWh</span><span class="label">Solar generation</span></div>
-                <div class="summary-stat"><span class="value">${summary.appliances_covered}/${summary.appliances_total}</span><span class="label">Appliances fully solar-covered</span></div>
-                <div class="summary-stat"><span class="value">~${summary.estimated_kwh_saved} kWh</span><span class="label">Estimated grid energy saved</span></div>
-                <div class="summary-stat"><span class="value">~${summary.estimated_cost_saved.toLocaleString()}</span><span class="label">Estimated NGN saved</span></div>
-            </div>
-            <div class="summary-note">Savings are a rough estimate, not billing-accurate. Only today's forecast is saved to My Live Log.</div>
-        </div>
-    `;
-}
-
-function renderCards(recommendations) {
-    const container = document.getElementById("cards");
-    container.innerHTML = "";
-    for (const [appliance, window] of Object.entries(recommendations)) {
-        const card = document.createElement("div");
-        if (!window) {
-            card.className = "result-card";
-            card.innerHTML = `<h3>${appliance.replace(/_/g, " ")}</h3><div class="window">No window found</div>`;
-            container.appendChild(card);
-            continue;
-        }
-        const startTime = window.start_time.split(" ")[1]?.slice(0, 5) || window.start_time;
-        const endTime = window.end_time.split(" ")[1]?.slice(0, 5) || window.end_time;
         
-        const solar = window.solar_pct || 0;
-        const battery = window.battery_pct || 0;
-        const grid = window.grid_pct || (100 - solar - battery);
-
-        let statusClass, statusText;
-        if (grid === 0) {
-            statusClass = "covered";
-            if (battery > 0 && solar > 0) statusText = `Powered by Solar (${solar}%) & Battery (${battery}%)`;
-            else if (battery > 0) statusText = `Fully powered by Battery`;
-            else statusText = `Fully powered by Solar`;
-        } else if (solar > 0 || battery > 0) {
-            statusClass = "partial";
-            let parts = [];
-            if (solar > 0) parts.push(`Solar ${solar}%`);
-            if (battery > 0) parts.push(`Battery ${battery}%`);
-            statusText = `${parts.join(", ")} -- Grid ${grid}%`;
-        } else {
-            statusClass = "grid-needed";
-            statusText = "No solar/battery available -- Grid needed";
+        if (tbody.innerHTML === "") {
+            tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-tertiary);">No appliances configured. Go to the Appliances page to add some!</td></tr>`;
         }
-
-        let windowDisplay = `${startTime} - ${endTime}`;
-        if (solar === 0) {
-            windowDisplay = "Flexible / Anytime";
-        }
-
-        card.className = "result-card " + statusClass;
-        card.innerHTML = `
-            <h3>${appliance.replace(/_/g, " ")}</h3>
-            <div class="window">${windowDisplay}</div>
-            <div class="status">${statusText}</div>
-        `;
-        container.appendChild(card);
-    }
-}
-
-function renderChart(dayData, batteryEnabled) {
-    const labels = dayData.map(r => r.timestamp.split(" ")[1]?.slice(0, 5) || r.timestamp);
-    const load = dayData.map(r => r.predicted_nonflex_kW);
-    const pv = dayData.map(r => r.predicted_pv_kW);
-    const surplus = dayData.map(r => r.surplus_kW);
-
-    const ctx = document.getElementById("energyChart").getContext("2d");
-    if (chart) chart.destroy();
-    
-    const isLight = document.body.classList.contains('light-theme');
-    const colors = {
-        text: isLight ? '#475569' : '#9aa0a6',
-        grid: isLight ? 'rgba(0,0,0,0.05)' : '#262b36',
-        load: isLight ? '#ef4444' : '#f43f5e',
-        pv: isLight ? '#f59e0b' : '#f59e0b',
-        surplus: isLight ? '#10b981' : '#34d399',
-        battery: isLight ? '#8b5cf6' : '#a855f7'
-    };
-
-    const gradientPV = ctx.createLinearGradient(0, 0, 0, 400);
-    gradientPV.addColorStop(0, isLight ? 'rgba(245,158,11,0.2)' : 'rgba(245,158,11,0.2)');
-    gradientPV.addColorStop(1, 'rgba(245,158,11,0)');
-
-    const datasets = [
-        { label: "Predicted Base+HVAC Load (kW)", data: load, borderColor: colors.load, borderWidth: 2, pointRadius: 0, tension: 0.4, yAxisID: "y" },
-        { label: "Predicted PV (kW)", data: pv, borderColor: colors.pv, backgroundColor: gradientPV, fill: true, borderWidth: 2, pointRadius: 0, tension: 0.4, yAxisID: "y" },
-        { label: batteryEnabled ? "Surplus incl. battery (kW)" : "Surplus (kW)", data: surplus, borderColor: colors.surplus, borderWidth: 2, borderDash: [4, 4], pointRadius: 0, tension: 0.4, yAxisID: "y" },
-    ];
-
-    if (batteryEnabled) {
-        const soc = dayData.map(r => r.battery_soc_kWh);
-        datasets.push({ label: "Battery charge (kWh)", data: soc, borderColor: colors.battery, borderWidth: 2, pointRadius: 0, tension: 0.4, yAxisID: "y1" });
-    }
-
-    chart = new Chart(ctx, {
-        type: "line",
-        data: { labels, datasets },
-        options: {
-            responsive: true,
-            animation: { duration: 800, easing: 'easeOutQuart' },
-            interaction: { mode: 'index', intersect: false },
-            plugins: { 
-                legend: { labels: { color: colors.text, font: { family: 'Inter' } } },
-                tooltip: { backgroundColor: isLight ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.8)', titleColor: isLight ? '#000' : '#fff', bodyColor: isLight ? '#000' : '#fff', borderColor: colors.grid, borderWidth: 1 }
+        
+        // Update Chart
+        const labels = today.day_data.map(d => new Date(d.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}));
+        const pvData = today.day_data.map(d => d.predicted_pv_kW);
+        const loadData = today.day_data.map(d => d.predicted_nonflex_kW);
+        
+        const isDark = document.body.classList.contains('dark-theme');
+        const textColor = isDark ? '#8b949e' : '#4b5563';
+        const gridColor = isDark ? '#30363d' : '#e5e7eb';
+        
+        if (mainChart) mainChart.destroy();
+        mainChart = new Chart(document.getElementById('mainChart'), {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Solar PV Output (kW)',
+                        data: pvData,
+                        borderColor: '#2563eb',
+                        backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    },
+                    {
+                        label: 'Home Load (kW)',
+                        data: loadData,
+                        borderColor: '#ef4444',
+                        borderDash: [5, 5],
+                        fill: false,
+                        tension: 0.1
+                    }
+                ]
             },
-            scales: {
-                x: { ticks: { color: colors.text, maxTicksLimit: 12 }, grid: { color: colors.grid } },
-                y: { position: "left", ticks: { color: colors.text }, grid: { color: colors.grid } },
-                y1: { position: "right", ticks: { color: colors.text }, grid: { drawOnChartArea: false }, display: batteryEnabled }
-            }
-        }
-    });
-}
-
-function aggregateHourly(dayData) {
-    const hourlyStats = {};
-    dayData.forEach(r => {
-        const hourLabel = (r.timestamp.split(" ")[1] || "00:00").slice(0, 2);
-        if (!hourlyStats[hourLabel]) {
-            hourlyStats[hourLabel] = { solar: 0, battery: 0, grid: 0 };
-        }
-        hourlyStats[hourLabel].solar += (r.solar_used_kW || 0) * 0.25;
-        hourlyStats[hourLabel].battery += (r.battery_discharge_kW || 0) * 0.25;
-        hourlyStats[hourLabel].grid += (r.grid_import_kW || 0) * 0.25;
-    });
-    
-    return Object.keys(hourlyStats).sort().map(hour => ({
-        hour: hour + ":00",
-        solar: Math.round(hourlyStats[hour].solar * 100) / 100,
-        battery: Math.round(hourlyStats[hour].battery * 100) / 100,
-        grid: Math.round(hourlyStats[hour].grid * 100) / 100,
-    }));
-}
-
-function renderHourlyChart(dayData) {
-    const hourly = aggregateHourly(dayData);
-    
-    // Total generation for the header
-    const totalGen = dayData.reduce((sum, r) => sum + (r.predicted_pv_kW || 0) * 0.25, 0);
-    document.getElementById("totalGenLabel").textContent = `${totalGen.toFixed(2)} kWh`;
-
-    const ctx = document.getElementById("hourlyChart").getContext("2d");
-    if (hourlyChart) hourlyChart.destroy();
-    
-    const isLight = document.body.classList.contains('light-theme');
-    const colors = {
-        text: isLight ? '#475569' : '#9aa0a6',
-        gridLines: isLight ? 'rgba(0,0,0,0.05)' : '#262b36',
-        solar: isLight ? 'rgba(245, 158, 11, 0.9)' : 'rgba(245, 158, 11, 0.9)',
-        battery: isLight ? 'rgba(16, 185, 129, 0.9)' : 'rgba(16, 185, 129, 0.9)',
-        gridImport: isLight ? 'rgba(239, 68, 68, 0.9)' : 'rgba(239, 68, 68, 0.9)'
-    };
-    
-    hourlyChart = new Chart(ctx, {
-        type: "bar",
-        data: {
-            labels: hourly.map(h => h.hour),
-            datasets: [
-                { label: "Solar Energy Used (kWh)", data: hourly.map(h => h.solar), backgroundColor: colors.solar },
-                { label: "Battery Energy Used (kWh)", data: hourly.map(h => h.battery), backgroundColor: colors.battery },
-                { label: "Grid Energy Used (kWh)", data: hourly.map(h => h.grid), backgroundColor: colors.gridImport }
-            ]
-        },
-        options: {
-            responsive: true,
-            animation: { duration: 800, easing: 'easeOutQuart' },
-            interaction: { mode: 'index', intersect: false },
-            plugins: { 
-                legend: { labels: { color: colors.text, font: { family: 'Inter' } } },
-                tooltip: { 
-                    backgroundColor: isLight ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.8)', 
-                    titleColor: isLight ? '#000' : '#fff', bodyColor: isLight ? '#000' : '#fff', 
-                    borderColor: colors.gridLines, borderWidth: 1,
-                    callbacks: {
-                        label: function(context) { return context.dataset.label + ': ' + context.parsed.y.toFixed(2); }
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { labels: { color: textColor } }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: gridColor },
+                        ticks: { color: textColor }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: textColor, maxTicksLimit: 12 }
                     }
                 }
-            },
-            scales: {
-                x: { stacked: true, ticks: { color: colors.text }, grid: { display: false } },
-                y: { stacked: true, ticks: { color: colors.text }, grid: { color: colors.gridLines }, title: { display: true, text: "kWh", color: colors.text } }
             }
-        }
-    });
-}
-
-window.addEventListener('themeChanged', () => {
-    if (multiDayData && multiDayData[activeDayIndex]) {
-        renderActiveDay();
+        });
+        
+        // Let the AI know the data has loaded
+        window.dispatchEvent(new CustomEvent('dataLoaded', { detail: today }));
+        showToast("Engine run complete");
+        
+    } catch(e) {
+        showToast("Failed to fetch forecast", "error");
+        console.error(e);
     }
-});
+}
 </script>
 {% endblock %}

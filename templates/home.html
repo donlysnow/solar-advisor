@@ -21,58 +21,57 @@
     </p>
 
     <div class="hero-actions" style="gap: 20px; margin-top: 16px;">
-        <a href="{{ url_for('live_page') }}"><button class="blue" style="padding: 16px 32px; font-size: 16px;">⚡ Get today's recommendation</button></a>
-        <a href="{{ url_for('historical_page') }}"><button class="secondary" style="padding: 16px 32px; font-size: 16px;">📊 Try the historical demo</button></a>
+        <a href="{{ url_for('live_page') }}"><button class="primary" style="padding: 16px 32px; font-size: 16px;">⚡ Get today's recommendation</button></a>
+        <a href="{{ url_for('historical_page') }}"><button class="ghost" style="padding: 16px 32px; font-size: 16px; border: 1px solid var(--border);">📊 Try the historical demo</button></a>
     </div>
 </div>
 
 <style>
-.flow-line { width: 100px; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; position: relative; overflow: hidden; }
-.light-theme .flow-line { background: rgba(0,0,0,0.1); }
+.flow-line { width: 100px; height: 4px; background: rgba(0,0,0,0.1); border-radius: 2px; position: relative; overflow: hidden; }
+.dark-theme .flow-line { background: rgba(255,255,255,0.1); }
 .flow-particle { position: absolute; top: 0; left: -20px; width: 40px; height: 100%; background: linear-gradient(90deg, transparent, var(--accent), transparent); animation: flow 2s infinite linear; }
 .flow-particle.delay { animation-delay: 1s; }
 @keyframes flow { 0% { left: -40px; } 100% { left: 100%; } }
-.panel-node { box-shadow: 0 0 30px var(--accent-blue-glow); }
 </style>
 
 <!-- Cost Gamification: Your Impact -->
 <div id="impactSection" style="display: none; margin-bottom: 60px;">
     <h2>Your Impact</h2>
-    <div class="summary-banner quality-good" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
+    <div class="panel" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; border-color: var(--success); background: var(--success-bg);">
         <div>
-            <div class="headline" style="margin-bottom: 10px;">Achievements Unlocked 🏆</div>
-            <p style="color: var(--text-dim); font-size: 14px; max-width: 500px; margin: 0 0 20px;">
+            <div class="headline" style="margin-bottom: 10px; font-weight: 600;">Achievements Unlocked 🏆</div>
+            <p style="color: var(--text-secondary); font-size: 14px; max-width: 500px; margin: 0 0 20px;">
                 By optimizing your appliances with Solar Advisor, you've significantly reduced your reliance on grid energy. Here's your lifetime impact based on your Live Logs:
             </p>
-            <div class="summary-stats">
-                <div class="summary-stat"><span class="value" id="impactKwh">0 kWh</span><span class="label">Grid Energy Saved</span></div>
-                <div class="summary-stat"><span class="value" id="impactMoney">₦0</span><span class="label">Money Saved</span></div>
+            <div style="display:flex; gap:24px;">
+                <div class="kpi-card" style="background:transparent; padding:0; border:none;"><span class="kpi-value" id="impactKwh">0 kWh</span><span class="kpi-label">Grid Energy Saved</span></div>
+                <div class="kpi-card" style="background:transparent; padding:0; border:none;"><span class="kpi-value" id="impactMoney">₦0</span><span class="kpi-label">Money Saved</span></div>
             </div>
         </div>
-        <div style="text-align: center; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 20px 40px; border-radius: 16px;">
+        <div style="text-align: center; background: white; padding: 20px 40px; border-radius: 16px; box-shadow: var(--shadow-sm);">
             <div style="font-size: 48px; margin-bottom: 8px;">🌳</div>
-            <div style="font-size: 24px; font-weight: 800; color: var(--text);" id="impactTrees">0 Trees</div>
-            <div style="font-size: 12px; color: var(--accent); font-weight: 600; text-transform: uppercase;">Equivalent Planted</div>
+            <div style="font-size: 24px; font-weight: 800; color: var(--success);" id="impactTrees">0 Trees</div>
+            <div style="font-size: 12px; color: var(--text-secondary); font-weight: 600; text-transform: uppercase;">Equivalent Planted</div>
         </div>
     </div>
 </div>
 
 <h2>What you get</h2>
-<div class="cards">
+<div class="data-grid mt-4">
     <div class="panel" style="text-align: center;">
         <div style="font-size: 36px; margin-bottom: 16px;">🌤️</div>
-        <h3 style="margin-top:0; color: var(--text);">Solar Forecast</h3>
-        <p style="color:var(--text-dim); font-size:14px; line-height: 1.6;">Predicts your panel output for the rest of today using real weather data for your location.</p>
+        <h3 style="margin-top:0; color: var(--text-primary);">Solar Forecast</h3>
+        <p style="color:var(--text-secondary); font-size:14px; line-height: 1.6;">Predicts your panel output for the rest of today using real weather data for your location.</p>
     </div>
     <div class="panel" style="text-align: center;">
         <div style="font-size: 36px; margin-bottom: 16px;">🔌</div>
-        <h3 style="margin-top:0; color: var(--text);">Load Forecast</h3>
-        <p style="color:var(--text-dim); font-size:14px; line-height: 1.6;">Estimates your household's background power draw so we know how much solar surplus is actually available.</p>
+        <h3 style="margin-top:0; color: var(--text-primary);">Load Forecast</h3>
+        <p style="color:var(--text-secondary); font-size:14px; line-height: 1.6;">Estimates your household's background power draw so we know how much solar surplus is actually available.</p>
     </div>
     <div class="panel" style="text-align: center;">
         <div style="font-size: 36px; margin-bottom: 16px;">⏱️</div>
-        <h3 style="margin-top:0; color: var(--text);">Appliance Scheduling</h3>
-        <p style="color:var(--text-dim); font-size:14px; line-height: 1.6;">Finds the best time window for each of your appliances, and tells you honestly when grid power will still be needed.</p>
+        <h3 style="margin-top:0; color: var(--text-primary);">Appliance Scheduling</h3>
+        <p style="color:var(--text-secondary); font-size:14px; line-height: 1.6;">Finds the best time window for each of your appliances, and tells you honestly when grid power will still be needed.</p>
     </div>
 </div>
 

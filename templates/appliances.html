@@ -2,8 +2,21 @@
 {% block title %}My Appliances{% endblock %}
 {% block content %}
 
+<style>
+.library-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-bottom: 32px; }
+.library-chip { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; text-align: center; cursor: pointer; transition: all 0.2s; box-shadow: var(--shadow-sm); display:flex; flex-direction:column; align-items:center; }
+.library-chip:hover { border-color: var(--accent); background: var(--bg-hover); transform: translateY(-2px); }
+.chip-icon { font-size: 24px; margin-bottom: 8px; }
+.chip-name { font-weight: 500; font-size: 13px; color: var(--text-primary); margin-bottom: 4px; text-transform: capitalize; }
+.chip-power { font-size: 12px; color: var(--text-secondary); }
+
+.appliance-row { background: var(--bg-panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; display: flex; gap: 16px; align-items: center; transition: opacity 0.3s; box-shadow: var(--shadow-sm); }
+.field-group { display: flex; flex-direction: column; }
+.field-group span { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+</style>
+
 <h1>My Appliances</h1>
-<p class="lead">Pick from common appliances below, or add your own. Set quantity, and enter power in watts or kilowatts, whichever your device label shows.</p>
+<p class="lead" style="color:var(--text-secondary); margin-bottom:24px;">Pick from common appliances below, or add your own. Set quantity, and enter power in watts or kilowatts, whichever your device label shows.</p>
 
 <h2>Quick add</h2>
 <div class="library-grid" id="libraryGrid"></div>
@@ -11,14 +24,14 @@
 <h2>Your list</h2>
 <div class="panel">
     <div id="applianceRows"></div>
-    <div id="emptyMsg" style="color:var(--text-dim); font-size:14px; margin-bottom:12px;">
+    <div id="emptyMsg" style="color:var(--text-tertiary); font-size:14px; margin-bottom:16px;">
         No appliances yet. Tap one above, or add a custom one below.
     </div>
-    <div style="display:flex; gap:10px; margin-top:8px;">
-        <button class="secondary" onclick="addRow()">+ Add custom appliance</button>
-        <button onclick="saveAppliances()">Save changes</button>
+    <div style="display:flex; gap:12px; margin-top:16px; border-top: 1px solid var(--border); padding-top: 16px;">
+        <button class="ghost" onclick="addRow()">+ Add custom appliance</button>
+        <button class="primary" onclick="saveAppliances()">Save changes</button>
     </div>
-    <div id="saveStatus" style="margin-top:10px; font-size:13px; color:var(--accent);"></div>
+    <div id="saveStatus" style="margin-top:12px; font-size:13px; color:var(--accent);"></div>
 </div>
 
 <script>
