@@ -4,12 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Solar Advisor Dashboard</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=3.0">
 <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
-<body class="{% if request.endpoint in ['login', 'register'] %}auth-page{% endif %}">
+{% set is_auth = (active in ['login', 'register']) or (request.endpoint in ['login', 'register']) %}
+<body class="{% if is_auth %}auth-page{% endif %}">
 
 <script>
     if ('serviceWorker' in navigator) {
@@ -19,8 +20,22 @@
     }
 </script>
 
+{% if is_auth %}
+<!-- 100% ISOLATED CLEAN AUTH SCREEN (NO SIDEBAR OR OVERLAY IN DOM) -->
+<div class="auth-page-wrapper" style="min-height: 100vh; width: 100vw; display: flex; align-items: center; justify-content: center; background: var(--bg-app); padding: 24px; box-sizing: border-box; position: relative;">
+    <div style="position: absolute; top: 20px; right: 20px; z-index: 100;">
+        <button id="authThemeToggle" class="ghost" style="padding: 8px 14px; border: 1px solid var(--border); background: var(--bg-panel); border-radius: var(--radius); cursor: pointer;" onclick="toggleThemeManual()">
+            <span class="theme-icon">🌙</span> <span class="theme-label">Dark Mode</span>
+        </button>
+    </div>
+    <div style="width: 100%; max-width: 440px; margin: auto;">
+        {% block content %}{% endblock %}
+    </div>
+</div>
+{% else %}
+<!-- FULL APP DASHBOARD -->
 <div class="app-container">
-    <!-- Sidebar (hidden automatically on Login/Register) -->
+    <!-- Sidebar -->
     <nav class="sidebar">
         <div class="brand"><span class="dot"></span> Solar Advisor</div>
         <a class="nav-link {% if active == 'home' %}active{% endif %}" href="{{ url_for('home') }}">🏠 Overview</a>
@@ -67,7 +82,7 @@
         
         <main class="main-scroll">
             <div class="content-max">
-                {% block content %}{% endblock %}
+                {% block main_content %}{{ self.content() }}{% endblock %}
             </div>
         </main>
     </div>
@@ -91,14 +106,6 @@
             </div>
         </div>
     </aside>
-</div>
-
-<!-- Floating theme toggle for auth pages -->
-{% if request.endpoint in ['login', 'register'] %}
-<div style="position: fixed; top: 16px; right: 16px; z-index: 100;">
-    <button id="authThemeToggle" class="ghost" style="padding: 8px 12px; border: 1px solid var(--border); background: var(--bg-panel);" onclick="document.getElementById('themeToggle').click()">
-        <span class="icon">🌙</span> Dark Mode
-    </button>
 </div>
 {% endif %}
 

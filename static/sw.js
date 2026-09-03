@@ -1,4 +1,4 @@
-const CACHE_NAME = 'solar-advisor-v2';
+const CACHE_NAME = 'solar-advisor-v3';
 const ASSETS_TO_CACHE = [
   '/static/style.css',
   '/static/manifest.json',

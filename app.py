@@ -171,7 +171,7 @@ def register():
         db.session.commit()
         login_user(new_user)
         return redirect(url_for('home'))
-    return render_template("register.html")
+    return render_template("register.html", active="register")
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -184,7 +184,7 @@ def login():
             return redirect(url_for('home'))
         else:
             flash("Login Unsuccessful. Please check email and password", "danger")
-    return render_template("login.html")
+    return render_template("login.html", active="login")
 
 @app.route("/logout")
 def logout():
