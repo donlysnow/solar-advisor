@@ -9,7 +9,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
-<body>
+<body class="{% if request.endpoint in ['login', 'register'] %}auth-page{% endif %}">
 
 <script>
     if ('serviceWorker' in navigator) {
@@ -20,7 +20,7 @@
 </script>
 
 <div class="app-container">
-    <!-- Sidebar -->
+    <!-- Sidebar (hidden automatically on Login/Register) -->
     <nav class="sidebar">
         <div class="brand"><span class="dot"></span> Solar Advisor</div>
         <a class="nav-link {% if active == 'home' %}active{% endif %}" href="{{ url_for('home') }}">🏠 Overview</a>
@@ -34,8 +34,6 @@
         {% if current_user.is_authenticated %}
             <a class="nav-link {% if active == 'profile' %}active{% endif %}" href="{{ url_for('profile') }}">👤 Profile</a>
             <a class="nav-link" href="{{ url_for('logout') }}" style="color: var(--danger);">🚪 Logout</a>
-        {% else %}
-            <a class="nav-link {% if active == 'login' %}active{% endif %}" href="{{ url_for('login') }}">🔐 Login</a>
         {% endif %}
 
         <button id="themeToggle" class="ghost mt-4" style="justify-content: flex-start; padding: 10px 12px; width: 100%;">
@@ -94,6 +92,15 @@
         </div>
     </aside>
 </div>
+
+<!-- Floating theme toggle for auth pages -->
+{% if request.endpoint in ['login', 'register'] %}
+<div style="position: fixed; top: 16px; right: 16px; z-index: 100;">
+    <button id="authThemeToggle" class="ghost" style="padding: 8px 12px; border: 1px solid var(--border); background: var(--bg-panel);" onclick="document.getElementById('themeToggle').click()">
+        <span class="icon">🌙</span> Dark Mode
+    </button>
+</div>
+{% endif %}
 
 <!-- Toast Notifications -->
 <div id="toast-container"></div>

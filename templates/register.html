@@ -1,35 +1,47 @@
 {% extends "base.html" %}
-{% block title %}Register{% endblock %}
+{% block title %}Register - Solar Advisor{% endblock %}
+{% block header_title %}Create Account{% endblock %}
+
 {% block content %}
-<div class="panel" style="max-width:400px; margin:40px auto; text-align:center;">
-    <h2>Create an Account</h2>
+<div class="panel" style="max-width:440px; width: 100%; margin: 0 auto; padding: 32px; box-shadow: var(--shadow-lg);">
+    <div style="text-align: center; margin-bottom: 24px;">
+        <div style="display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; background: var(--accent-bg); border-radius: 12px; margin-bottom: 12px; font-size: 24px;">
+            ☀️
+        </div>
+        <h2 style="font-size: 22px; margin-bottom: 6px;">Create an Account</h2>
+        <p style="color: var(--text-secondary); font-size: 13px; margin: 0;">Start optimizing your solar energy and battery storage</p>
+    </div>
     
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         {% for category, message in messages %}
-          <div style="color: #ef4444; margin-bottom:15px; font-weight:bold;">{{ message }}</div>
+          <div style="background: var(--danger-bg); border: 1px solid var(--danger); color: var(--danger); padding: 10px 14px; border-radius: var(--radius); margin-bottom: 18px; font-size: 13px; font-weight: 500;">
+            ⚠️ {{ message }}
+          </div>
         {% endfor %}
       {% endif %}
     {% endwith %}
 
-    <form method="POST" action="{{ url_for('register') }}" style="display:flex; flex-direction:column; gap:15px; text-align:left;">
+    <form method="POST" action="{{ url_for('register') }}" style="display: flex; flex-direction: column; gap: 16px;">
         <div>
-            <label style="display:block; margin-bottom:5px; color:var(--text-dim);">Name</label>
-            <input type="text" name="name" required style="width:100%; padding:12px; background:var(--input-bg); border:1px solid var(--border); color:var(--text-color); border-radius:8px;">
+            <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: var(--text-secondary);">Full Name</label>
+            <input type="text" name="name" required placeholder="John Doe" style="width: 100%; padding: 10px 14px; font-size: 14px;">
         </div>
         <div>
-            <label style="display:block; margin-bottom:5px; color:var(--text-dim);">Email Address</label>
-            <input type="email" name="email" required style="width:100%; padding:12px; background:var(--input-bg); border:1px solid var(--border); color:var(--text-color); border-radius:8px;">
+            <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: var(--text-secondary);">Email Address</label>
+            <input type="email" name="email" required placeholder="name@company.com" style="width: 100%; padding: 10px 14px; font-size: 14px;">
         </div>
         <div>
-            <label style="display:block; margin-bottom:5px; color:var(--text-dim);">Password</label>
-            <input type="password" name="password" required style="width:100%; padding:12px; background:var(--input-bg); border:1px solid var(--border); color:var(--text-color); border-radius:8px;">
+            <label style="display: block; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: var(--text-secondary);">Password</label>
+            <input type="password" name="password" required placeholder="••••••••" style="width: 100%; padding: 10px 14px; font-size: 14px;">
         </div>
-        <button type="submit" class="btn" style="width:100%; justify-content:center; margin-top:10px;">Register</button>
+        <button type="submit" class="primary" style="width: 100%; padding: 12px; font-size: 14px; font-weight: 600; margin-top: 8px;">
+            Get Started →
+        </button>
     </form>
     
-    <div style="margin-top:20px; color:var(--text-dim);">
-        Already have an account? <a href="{{ url_for('login') }}" style="color:var(--accent-blue);">Login</a>
+    <div style="margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border); text-align: center; font-size: 13px; color: var(--text-secondary);">
+        Already have an account? <a href="{{ url_for('login') }}" style="color: var(--accent); font-weight: 600; text-decoration: none;">Sign in</a>
     </div>
 </div>
 {% endblock %}
