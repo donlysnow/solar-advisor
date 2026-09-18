@@ -144,12 +144,18 @@ def build_forecast_row_set(latitude, longitude, pv_capacity_kW, days=1, historic
         weather = fetch_historical_weather(latitude, longitude, start_date, end_date)
         cutoff = None
     else:
-        weather = fetch_weather_forecast(latitude, longitude, days=days, past_days=2)
-        cutoff = pd.Timestamp.now(tz=weather["timestamp"].dt.tz).normalize()
+        past_days = 2
+        weather = fetch_weather_forecast(latitude, longitude, days=days, past_days=past_days)
+        # Determine the start of the forecast window from the Open-Meteo local timeline
+        if len(weather) >= past_days * 24:
+            cutoff_date = weather["timestamp"].dt.date.iloc[past_days * 24]
+            cutoff = pd.Timestamp(cutoff_date)
+        else:
+            cutoff = weather["timestamp"].min()
 
     weather = upsample_to_15min(weather)
     weather = add_calendar_columns(weather)
-    weather["pv_capacity_kW"] = pv_capacity_kW
+    weather["pv_capacity_kW"] = float(pv_capacity_kW)
     weather["house_id"] = 0
 
     weather = add_cyclical_time_features(weather)
@@ -157,5 +163,10 @@ def build_forecast_row_set(latitude, longitude, pv_capacity_kW, days=1, historic
 
     if cutoff is not None:
         weather = weather[weather["timestamp"] >= cutoff].reset_index(drop=True)
+
+    # If any remaining NaNs in lag features, backfill or fill with 0 to prevent empty drops
+    for col in ["solar_irradiance_lag_1", "solar_irradiance_lag_4", "solar_irradiance_lag_96", "irradiance_roll_mean_4"]:
+        if col in weather.columns:
+            weather[col] = weather[col].bfill().fillna(0.0)
 
     return weather

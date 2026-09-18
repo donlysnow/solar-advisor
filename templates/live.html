@@ -357,7 +357,7 @@ async function loadLiveRecommendations() {
         showToast("Engine run complete");
         
     } catch(e) {
-        showToast("Failed to fetch forecast", "error");
+        showToast("Forecast error: " + (e.message || "Network issue"), "error");
         console.error(e);
     }
 }
