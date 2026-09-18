@@ -310,10 +310,12 @@ voiceBtn.addEventListener('click', () => {
 function updateTimeGreetings() {
     const hour = new Date().getHours();
     let greeting = "Good evening";
-    if (hour >= 5 && hour < 12) {
+    if (hour >= 4 && hour < 12) {
         greeting = "Good morning";
-    } else if (hour >= 12 && hour < 17) {
+    } else if (hour >= 12 && hour < 16) {
         greeting = "Good afternoon";
+    } else {
+        greeting = "Good evening";
     }
     
     document.querySelectorAll('.dynamic-time-greeting').forEach(el => {
@@ -321,6 +323,7 @@ function updateTimeGreetings() {
     });
 }
 updateTimeGreetings();
+setInterval(updateTimeGreetings, 60000);
 
 async function reverseGeocode(lat, lon) {
     try {
