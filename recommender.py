@@ -241,16 +241,19 @@ def summarize_day(df_day, final_schedule, appliances, electricity_rate=225.0):
             saved = total_req * coverage_fraction
             estimated_kwh_saved += saved
 
-    estimated_cost_saved = estimated_kwh_saved * electricity_rate
+    total_grid_import_kWh = float(df_day["grid_import_kW"].sum() * 0.25) if "grid_import_kW" in df_day.columns else 0.0
 
     return {
         "solar_quality": solar_quality,
         "headline": headline,
+        "total_pv_kWh": round(total_pv_kWh_today, 1),
         "total_pv_kWh_today": round(total_pv_kWh_today, 1),
         "appliances_covered": appliances_covered,
         "appliances_total": len(appliances),
+        "total_grid_import_kWh": round(total_grid_import_kWh, 1),
         "estimated_kwh_saved": round(estimated_kwh_saved, 1),
         "estimated_cost_saved": round(estimated_cost_saved, 0),
+        "total_savings_currency": round(estimated_cost_saved, 0),
     }
 
 def get_recommendations_for_house_day(house_id, date_str, appliances=None):

@@ -263,20 +263,28 @@ async function loadLiveRecommendations() {
             headers: {"Content-Type": "application/json"},
             body: JSON.stringify(body)
         });
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         
-        if (data.error) {
-            showToast(data.error, "error");
+        if (!res.ok || data.error || !data.days || !data.days.length) {
+            showToast(data.error || "Could not generate forecast. Please check your inputs.", "error");
             return;
         }
         
         const today = data.days[0];
+        if (!today || !today.summary) {
+            showToast("Invalid forecast data received", "error");
+            return;
+        }
         
-        // Update KPIs
+        // Update KPIs with safe fallbacks
+        const pvKwh = today.summary.total_pv_kWh ?? today.summary.total_pv_kWh_today ?? 0;
+        const gridKwh = today.summary.total_grid_import_kWh ?? 0;
+        const savings = today.summary.total_savings_currency ?? today.summary.estimated_cost_saved ?? 0;
+
         document.getElementById("kpi-quality").textContent = (today.summary.solar_quality || "--").toUpperCase();
-        document.getElementById("kpi-generation").innerHTML = `${today.summary.total_pv_kWh.toFixed(1)} <span style="font-size:14px;font-weight:500;">kWh</span>`;
-        document.getElementById("kpi-grid").innerHTML = `${(today.summary.total_grid_import_kWh || 0).toFixed(1)} <span style="font-size:14px;font-weight:500;">kWh</span>`;
-        document.getElementById("kpi-savings").textContent = `₦${(today.summary.total_savings_currency || 0).toFixed(0)}`;
+        document.getElementById("kpi-generation").innerHTML = `${pvKwh.toFixed(1)} <span style="font-size:14px;font-weight:500;">kWh</span>`;
+        document.getElementById("kpi-grid").innerHTML = `${gridKwh.toFixed(1)} <span style="font-size:14px;font-weight:500;">kWh</span>`;
+        document.getElementById("kpi-savings").textContent = `₦${savings.toFixed(0)}`;
         
         // Update Table
         const tbody = document.getElementById("applianceTableBody");
