@@ -442,19 +442,28 @@ def live_recommendations():
     })
 
 
+def _safe_float(val, default):
+    try:
+        if val is None or val == "":
+            return default
+        f = float(val)
+        return default if (pd.isna(f) or np.isinf(f)) else f
+    except (ValueError, TypeError):
+        return default
+
 # ---------------- Live recommendations, multi-day ----------------
 
 @app.route("/api/live-recommendations-multiday", methods=["POST"])
 def live_recommendations_multiday():
     body = request.get_json(silent=True) or {}
-    latitude = body.get("lat", config.DEFAULT_LATITUDE)
-    longitude = body.get("lon", config.DEFAULT_LONGITUDE)
-    pv_capacity_kW = body.get("pv_capacity", 4.0)
-    background_load_kW = body.get("background_load_kW", config.DEFAULT_BACKGROUND_LOAD_KW)
-    system_loss_pct = body.get("system_loss_pct", 0)
-    electricity_rate = body.get("electricity_rate", 225.0)
+    latitude = _safe_float(body.get("lat"), config.DEFAULT_LATITUDE)
+    longitude = _safe_float(body.get("lon"), config.DEFAULT_LONGITUDE)
+    pv_capacity_kW = _safe_float(body.get("pv_capacity"), 4.0)
+    background_load_kW = _safe_float(body.get("background_load_kW"), config.DEFAULT_BACKGROUND_LOAD_KW)
+    system_loss_pct = _safe_float(body.get("system_loss_pct"), 0)
+    electricity_rate = _safe_float(body.get("electricity_rate"), 225.0)
     battery = body.get("battery")
-    forecast_days = body.get("days", 3)
+    forecast_days = int(_safe_float(body.get("days"), 1))
     appliances = get_session_appliances()
 
     try:

@@ -227,20 +227,31 @@ async function saveSettings() {
 let mainChart = null;
 
 async function loadLiveRecommendations() {
+    const latVal = parseFloat(document.getElementById("latInput")?.value);
+    const lonVal = parseFloat(document.getElementById("lonInput")?.value);
+    const pvVal = parseFloat(document.getElementById("pvInput")?.value);
+    const bgVal = parseFloat(document.getElementById("backgroundLoadInput")?.value);
+    const rateVal = parseFloat(document.getElementById("electricityRate")?.value);
+
     const body = {
-        lat: parseFloat(document.getElementById("latInput").value),
-        lon: parseFloat(document.getElementById("lonInput").value),
-        pv_capacity: parseFloat(document.getElementById("pvInput").value),
-        background_load_kW: parseFloat(document.getElementById("backgroundLoadInput").value),
-        electricity_rate: parseFloat(document.getElementById("electricityRate").value),
+        lat: isNaN(latVal) ? 6.5244 : latVal,
+        lon: isNaN(lonVal) ? 3.3792 : lonVal,
+        pv_capacity: isNaN(pvVal) ? 4.0 : pvVal,
+        background_load_kW: isNaN(bgVal) ? 0.3 : bgVal,
+        electricity_rate: isNaN(rateVal) ? 225.0 : rateVal,
+        days: 1
     };
     
-    if (document.getElementById("batteryToggle").checked) {
+    if (document.getElementById("batteryToggle")?.checked) {
+        const capVal = parseFloat(document.getElementById("batteryCapacityInput")?.value);
+        const chgVal = parseFloat(document.getElementById("batteryChargeRateInput")?.value);
+        const dsgVal = parseFloat(document.getElementById("batteryDischargeRateInput")?.value);
+        const socVal = parseFloat(document.getElementById("batterySocInput")?.value);
         body.battery = {
-            capacity_kWh: parseFloat(document.getElementById("batteryCapacityInput").value),
-            charge_rate_kW: parseFloat(document.getElementById("batteryChargeRateInput").value),
-            discharge_rate_kW: parseFloat(document.getElementById("batteryDischargeRateInput").value),
-            initial_soc_pct: parseFloat(document.getElementById("batterySocInput").value)
+            capacity_kWh: isNaN(capVal) ? 5.0 : capVal,
+            charge_rate_kW: isNaN(chgVal) ? 2.0 : chgVal,
+            discharge_rate_kW: isNaN(dsgVal) ? 2.0 : dsgVal,
+            initial_soc_pct: isNaN(socVal) ? 50.0 : socVal
         };
     }
     
@@ -250,7 +261,7 @@ async function loadLiveRecommendations() {
         const res = await fetch("/api/live-recommendations-multiday", {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ ...body, days: 1 })
+            body: JSON.stringify(body)
         });
         const data = await res.json();
         
